@@ -325,6 +325,13 @@ void main() async {
     }
   });
 
+  // Check for initial notification (if app was launched from notification)
+  final NotificationData? initialData = await FirebaseMessagingHandler.instance.checkInitial();
+  if (initialData != null) {
+    print('App launched from notification: ${initialData.title}');
+    // Handle initial notification
+  }
+
   runApp(MyApp());
 }
 
@@ -738,6 +745,11 @@ Future<Stream<NotificationData?>?> init({
   Future<bool> Function(String fcmToken)? updateTokenCallback,
   bool includeInitialNotificationInStream = false,
 })
+```
+
+#### **Initial Notification Handling**
+```dart
+Future<NotificationData?> checkInitial()
 ```
 
 #### **Notification Display**
