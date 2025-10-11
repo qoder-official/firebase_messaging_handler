@@ -13,6 +13,7 @@ class NotificationChannelData {
   final NotificationImportanceEnum importance;
   final bool playSound;
   final String? soundPath;
+  final String? soundFileName;
   final bool enableVibration;
   final bool enableLights;
   final Int64List? vibrationPattern;
@@ -29,6 +30,7 @@ class NotificationChannelData {
       this.importance = NotificationImportanceEnum.defaultImportance,
       this.playSound = true,
       this.soundPath,
+      this.soundFileName,
       this.enableVibration = true,
       this.enableLights = false,
       this.vibrationPattern,

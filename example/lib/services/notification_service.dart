@@ -1,7 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/notification_provider.dart';
 
+/// Example service demonstrating the new Firebase Messaging Handler architecture
+///
+/// This service showcases how to use the refactored plugin with:
+/// - Modular architecture with clear separation of concerns
+/// - Comprehensive error handling and logging
+/// - Analytics integration
+/// - Cross-platform notification management
+/// - Backward compatibility with existing APIs
 class NotificationService {
   final FirebaseMessagingHandler _messagingHandler =
       FirebaseMessagingHandler.instance;
@@ -11,7 +20,7 @@ class NotificationService {
 
   Future<void> initialize() async {
     try {
-      // Initialize with notification channels
+      // Initialize with notification channels using the new architecture
       final Stream<NotificationData?>? clickStream = await _messagingHandler
           .init(
             androidChannelList: [
@@ -48,7 +57,7 @@ class NotificationService {
             androidNotificationIconPath: '@drawable/ic_notification',
             senderId: '123456789012', // Replace with your actual sender ID
             updateTokenCallback: (String fcmToken) async {
-              print('FCM Token: $fcmToken');
+              debugPrint('FCM Token: $fcmToken');
               _notificationProvider.setFcmToken(fcmToken);
 
               // In a real app, send this token to your backend
@@ -72,15 +81,17 @@ class NotificationService {
         }
       });
 
-      // Set up analytics callback
+      // Set up analytics callback using the new architecture
       _messagingHandler.setAnalyticsCallback((event, data) {
-        print('Analytics Event: $event - $data');
+        debugPrint('Analytics Event: $event - $data');
+        // In a real app, you would send this to your analytics service
+        // Examples: Firebase Analytics, Mixpanel, Amplitude, etc.
       });
 
       _notificationProvider.setInitialized(true);
-      print('Firebase Messaging Handler initialized successfully');
+      debugPrint('Firebase Messaging Handler initialized successfully');
     } catch (e) {
-      print('Error initializing Firebase Messaging Handler: $e');
+      debugPrint('Error initializing Firebase Messaging Handler: $e');
       _notificationProvider.setInitialized(false);
     }
   }
@@ -136,22 +147,22 @@ class NotificationService {
   }
 
   void _showInAppNotification(NotificationData data) {
-    print('Showing in-app notification: ${data.title}');
+    debugPrint('Showing in-app notification: ${data.title}');
     // In a real app, you might show a snackbar or overlay
   }
 
   void _navigateToScreen(NotificationData data) {
-    print('Navigating to screen for notification: ${data.title}');
+    debugPrint('Navigating to screen for notification: ${data.title}');
     // In a real app, you would navigate to the appropriate screen
   }
 
   void _showReplyDialog(Map<String, dynamic>? payload) {
-    print('Showing reply dialog for payload: $payload');
+    debugPrint('Showing reply dialog for payload: $payload');
     // In a real app, show a dialog for replying
   }
 
   void _navigateToProfile(Map<String, dynamic>? payload) {
-    print('Navigating to profile for payload: $payload');
+    debugPrint('Navigating to profile for payload: $payload');
     // In a real app, navigate to user profile
   }
 
@@ -166,12 +177,12 @@ class NotificationService {
   }
 
   void _showPromotionDialog(NotificationData data) {
-    print('Showing promotion dialog: ${data.title}');
+    debugPrint('Showing promotion dialog: ${data.title}');
     // In a real app, show promotion details
   }
 
   void _showMessageDialog(NotificationData data) {
-    print('Showing message dialog: ${data.title}');
+    debugPrint('Showing message dialog: ${data.title}');
     // In a real app, show message details
   }
 

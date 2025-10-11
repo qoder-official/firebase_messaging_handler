@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 import 'package:clipboard/clipboard.dart';
 import '../providers/notification_provider.dart';
-import '../services/notification_service.dart';
+import '../services/notification_service.dart' as example;
 import '../widgets/notification_card.dart';
 import '../widgets/feature_card.dart';
 
@@ -15,12 +15,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late NotificationService _notificationService;
+  late example.NotificationService _notificationService;
 
   @override
   void initState() {
     super.initState();
-    _notificationService = NotificationService(
+    _notificationService = example.NotificationService(
       Provider.of<NotificationProvider>(context, listen: false),
     );
     _notificationService.initialize();
@@ -36,7 +36,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Firebase Messaging Handler Showcase'),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Firebase Messaging Handler Showcase'),
+            Text('New Architecture Demo', style: TextStyle(fontSize: 12)),
+          ],
+        ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           Consumer<NotificationProvider>(
@@ -46,12 +52,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: provider.fcmToken != null
                     ? () async {
                         await FlutterClipboard.copy(provider.fcmToken!);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('FCM token Copied to clipboard'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('FCM token Copied to clipboard'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
                       }
                     : null,
                 tooltip: 'Copy FCM Token',
@@ -114,16 +122,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     FeatureCard(
                       title: 'Schedule Recurring',
-                      description:
-                          'Schedule daily recurring notifications',
+                      description: 'Schedule daily recurring notifications',
                       icon: Icons.repeat,
                       color: Colors.orange,
                       onTap: _notificationService.scheduleRecurringNotification,
                     ),
                     FeatureCard(
                       title: 'Create Notification Group',
-                      description:
-                          'Group multiple notifications together',
+                      description: 'Group multiple notifications together',
                       icon: Icons.group_work,
                       color: Colors.purple,
                       onTap: _notificationService.createNotificationGroup,
@@ -139,8 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   features: [
                     FeatureCard(
                       title: 'Update Badges',
-                      description:
-                          'Update badge counts for iOS and Android',
+                      description: 'Update badge counts for iOS and Android',
                       icon: Icons.badge,
                       color: Colors.teal,
                       onTap: _notificationService.updateBadges,
@@ -154,14 +159,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () async {
                         await _notificationService.messagingHandler
                             .createCustomSoundChannel(
-                          channelId: 'music_channel',
-                          channelName: 'Music Notifications',
-                          channelDescription:
-                              'Notifications with custom sound',
-                          soundFileName: 'default', // Use default for demo
-                          importance: NotificationImportanceEnum.high,
-                          priority: NotificationPriorityEnum.high,
-                        );
+                              channelId: 'music_channel',
+                              channelName: 'Music Notifications',
+                              channelDescription:
+                                  'Notifications with custom sound',
+                              soundFileName: 'default', // Use default for demo
+                              importance: NotificationImportanceEnum.high,
+                              priority: NotificationPriorityEnum.high,
+                            );
                       },
                     ),
                   ],
@@ -223,7 +228,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         '1. Tap any feature button above to trigger notifications\n'
                         '2. Send push notifications from Firebase Console\n'
                         '3. Use FCM tokens for targeted notifications\n'
-                        '4. Check the logs for detailed information',
+                        '4. Check the logs for detailed information\n'
+                        '5. Experience the new modular architecture!',
                       ),
                       const SizedBox(height: 8),
                       Consumer<NotificationProvider>(
@@ -263,13 +269,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: provider.isInitialized ? Colors.green : Colors.red,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  provider.isInitialized
-                      ? 'Firebase Messaging Handler Active'
-                      : 'Initializing...',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    provider.isInitialized
+                        ? 'Firebase Messaging Handler Active'
+                        : 'Initializing...',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -277,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             Text(
               provider.isInitialized
-                  ? '✅ Ready to receive and handle notifications'
+                  ? '✅ Ready to receive and handle notifications\n🏗️ Using new modular architecture'
                   : '⏳ Setting up notification handling...',
               style: TextStyle(color: Colors.grey.shade600),
             ),

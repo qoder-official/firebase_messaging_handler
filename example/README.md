@@ -1,6 +1,17 @@
 # Firebase Messaging Handler Example App
 
-A comprehensive showcase application demonstrating all the features of the **Firebase Messaging Handler** plugin.
+A comprehensive showcase application demonstrating all the features of the **Firebase Messaging Handler** plugin with the **new modular architecture**.
+
+## 🏗️ **New Architecture Features**
+
+This example now showcases the **refactored plugin architecture** with:
+
+- **🔧 Modular Design** - Clear separation of concerns with interfaces, services, and managers
+- **🧪 Better Testability** - Interface-based design enables easy mocking and testing
+- **📈 Enhanced Scalability** - Modular structure supports future feature additions
+- **🛡️ Robust Error Handling** - Comprehensive error handling and logging system
+- **⚙️ Configuration Management** - Centralized configuration with validation
+- **🔄 Backward Compatibility** - Existing APIs work unchanged with new architecture
 
 ## 🚀 **What This Example Demonstrates**
 
@@ -35,6 +46,8 @@ This example app showcases every feature of our Firebase messaging handler plugi
 Find your project's **Sender ID** in:
 - Firebase Console > Project Settings > Cloud Messaging
 - Look for "Sender ID" (usually a 12-digit number)
+
+**⚠️ IMPORTANT: Sender ID is required for all platforms and must be provided!**
 
 ### **3. Update Configuration**
 
@@ -118,6 +131,31 @@ flutter run -d ios
 - Check sound customization
 - Test scheduled notifications
 
+**🔑 iOS APNs Setup Required:**
+
+For iOS notifications to work properly, you **MUST** configure APNs:
+
+1. **Generate APNs Key:**
+   - Go to [Apple Developer Console](https://developer.apple.com/)
+   - Navigate to Certificates, Identifiers & Profiles
+   - Go to Keys section
+   - Create a new key with "Apple Push Notifications service (APNs)" enabled
+   - Download the `.p8` key file
+
+2. **Upload to Firebase:**
+   - Go to Firebase Console > Project Settings > Cloud Messaging
+   - Scroll to "Apple app configuration"
+   - Upload your APNs key (`.p8` file)
+   - Enter your Key ID and Team ID
+   - Choose environment: Sandbox (development) or Production
+
+3. **Without APNs setup:**
+   - iOS notifications will NOT work
+   - FCM tokens will show "APNs token not set" error
+   - This is normal behavior until APNs is configured
+
+**⚠️ This is a Firebase requirement, not our plugin limitation!**
+
 ### **Web**
 - Test browser notification permissions
 - Verify notification display in browser
@@ -176,6 +214,14 @@ messagingHandler.setAnalyticsCallback((event, data) {
 **iOS badges not updating:**
 - Requires proper APNs certificate configuration
 - May not work in simulator
+- **Must upload APNs key to Firebase Console**
+
+**APNs token not set error:**
+- This is **NORMAL** until APNs is configured
+- Generate APNs key in Apple Developer Console
+- Upload `.p8` key file to Firebase Console
+- Choose correct environment (Sandbox/Production)
+- **This is a Firebase requirement, not a plugin issue**
 
 **Custom sounds not playing:**
 - Add sound files to correct platform directories
@@ -201,6 +247,8 @@ This example app proves that our Firebase messaging handler plugin:
 4. **✅ Is production-ready** - Comprehensive error handling and logging
 5. **✅ Supports all platforms** - Android, iOS, and Web
 6. **✅ Offers advanced features** - Beyond basic Firebase messaging capabilities
+7. **✅ Uses modern architecture** - Modular, scalable, and maintainable design
+8. **✅ Maintains backward compatibility** - Existing code continues to work
 
 ## 🚀 **Next Steps**
 

@@ -11,9 +11,6 @@ void main() async {
   // Initialize Firebase (required)
   await Firebase.initializeApp();
 
-  // Check for initial notification (required)
-  await FirebaseMessagingHandler.instance.checkInitial();
-
   runApp(const MyApp());
 }
 

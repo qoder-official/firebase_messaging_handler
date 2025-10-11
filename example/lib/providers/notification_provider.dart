@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 
 class NotificationProvider extends ChangeNotifier {
-  List<NotificationData> _notifications = [];
+  final List<NotificationData> _notifications = [];
   NotificationData? _initialNotification;
   String? _fcmToken;
   bool _isInitialized = false;
@@ -67,4 +67,3 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-
