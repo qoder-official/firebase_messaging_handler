@@ -377,4 +377,9 @@ class FirebaseMessagingHandler {
   void trackAnalyticsEvent(String event, Map<String, dynamic> data) {
     FirebaseMessagingUtility.instance.trackAnalyticsEvent(event, data);
   }
+
+  /// Gets the current FCM token
+  Future<String?> getFcmToken() async {
+    return await FirebaseMessagingUtility.instance.getFcmToken();
+  }
 }

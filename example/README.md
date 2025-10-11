@@ -65,6 +65,7 @@ flutter run -d ios
 - Shows initialization status
 - Displays FCM token
 - Badge count indicators
+- **Copy FCM Token** button in app bar
 
 #### **🚀 Feature Showcase**
 - **Send Test Notification**: Interactive notification with action buttons

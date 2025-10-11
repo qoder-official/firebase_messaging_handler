@@ -1747,7 +1747,7 @@ class FirebaseMessagingUtility {
   }
 
   void _logMessage(String message) {
-    log(message, name: FirebaseMessagingHandlerConstants.logName);
+    log(message, name: 'Firebase Messaging Handler');
   }
 
   /// Subscribe to a topic
