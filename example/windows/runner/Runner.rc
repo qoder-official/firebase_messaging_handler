@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.qoder" "\0"
-            VALUE "FileDescription", "notification_utility_example_app" "\0"
+            VALUE "CompanyName", "qoder.flutter.fmhexample" "\0"
+            VALUE "FileDescription", "fmhexample" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "notification_utility_example_app" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2024 com.qoder. All rights reserved." "\0"
-            VALUE "OriginalFilename", "notification_utility_example_app.exe" "\0"
-            VALUE "ProductName", "notification_utility_example_app" "\0"
+            VALUE "InternalName", "fmhexample" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 qoder.flutter.fmhexample. All rights reserved." "\0"
+            VALUE "OriginalFilename", "fmhexample.exe" "\0"
+            VALUE "ProductName", "fmhexample" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

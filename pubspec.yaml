@@ -14,6 +14,8 @@ dependencies:
   firebase_messaging: '>=15.1.4'
   flutter_local_notifications: '>=18.0.0'
   shared_preferences: '>=2.0.0'
+  universal_html: '>=2.0.0'
+  timezone: '>=0.9.0'
 
 
 dev_dependencies:

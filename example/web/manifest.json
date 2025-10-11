@@ -1,6 +1,6 @@
 {
-    "name": "notification_utility_example_app",
-    "short_name": "notification_utility_example_app",
+    "name": "fmhexample",
+    "short_name": "fmhexample",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
