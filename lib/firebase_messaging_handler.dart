@@ -65,15 +65,6 @@ class FirebaseMessagingHandler {
     return await _notificationManager.getInitialNotificationData();
   }
 
-  /// Gets the initial notification data if the app was launched from a notification.
-  ///
-  /// This is useful when you want to handle initial notifications separately from the stream.
-  /// Returns null if the app was not launched from a notification.
-  @Deprecated('Use checkInitial() instead')
-  Future<NotificationData?> getInitialNotificationData() async {
-    return await checkInitial();
-  }
-
   /// Disposes of the notification handler resources.
   ///
   /// This method should be called when the app is being disposed to clean up
