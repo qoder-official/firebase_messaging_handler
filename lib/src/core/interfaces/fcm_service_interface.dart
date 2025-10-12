@@ -1,0 +1,39 @@
+/// Interface for Firebase Cloud Messaging service operations
+abstract class FCMServiceInterface {
+  /// Initializes the FCM service
+  Future<bool> initialize();
+
+  /// Requests notification permissions
+  Future<bool> requestPermissions();
+
+  /// Gets the FCM token
+  Future<String?> getToken({String? vapidKey});
+
+  /// Subscribes to a topic
+  Future<void> subscribeToTopic(String topic);
+
+  /// Unsubscribes from a topic
+  Future<void> unsubscribeFromTopic(String topic);
+
+  /// Deletes the FCM token
+  Future<void> deleteToken();
+
+  /// Gets the initial message if app was opened from notification
+  Future<dynamic> getInitialMessage();
+
+  /// Stream for foreground messages
+  Stream<dynamic> get onMessage;
+
+  /// Stream for background messages
+  Stream<dynamic> get onMessageOpenedApp;
+
+  /// Stream for background message handler
+  Stream<dynamic> get onBackgroundMessage;
+
+  /// Sets foreground notification presentation options
+  Future<void> setForegroundNotificationPresentationOptions({
+    bool alert = true,
+    bool badge = true,
+    bool sound = true,
+  });
+}
