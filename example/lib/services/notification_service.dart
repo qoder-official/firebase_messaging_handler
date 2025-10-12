@@ -23,54 +23,54 @@ class NotificationService {
   Future<void> initialize() async {
     try {
       // Initialize with notification channels using the new architecture
-      final Stream<NotificationData?>? clickStream = await _messagingHandler
-          .init(
-            androidChannelList: [
-              NotificationChannelData(
-                id: 'default_channel',
-                name: 'Default Notifications',
-                description: 'Default notification channel',
-                importance: NotificationImportanceEnum.high,
-                priority: NotificationPriorityEnum.high,
-                playSound: true,
-                enableVibration: true,
-                enableLights: true,
-              ),
-              NotificationChannelData(
-                id: 'actions_channel',
-                name: 'Action Notifications',
-                description: 'Notifications with interactive buttons',
-                importance: NotificationImportanceEnum.max,
-                priority: NotificationPriorityEnum.max,
-                playSound: true,
-                enableVibration: true,
-                enableLights: true,
-              ),
-              NotificationChannelData(
-                id: 'scheduled_channel',
-                name: 'Scheduled Notifications',
-                description: 'Scheduled notification channel',
-                importance: NotificationImportanceEnum.high,
-                priority: NotificationPriorityEnum.high,
-                playSound: true,
-                enableVibration: false,
-              ),
-            ],
-            androidNotificationIconPath: '@drawable/ic_notification',
-            senderId: '123456789012', // Replace with your actual sender ID
-            updateTokenCallback: (String fcmToken) async {
-              debugPrint('FCM Token: $fcmToken');
-              _notificationProvider.setFcmToken(fcmToken);
+      final Stream<NotificationData?>? clickStream =
+          await _messagingHandler.init(
+        androidChannelList: [
+          NotificationChannelData(
+            id: 'default_channel',
+            name: 'Default Notifications',
+            description: 'Default notification channel',
+            importance: NotificationImportanceEnum.high,
+            priority: NotificationPriorityEnum.high,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+          ),
+          NotificationChannelData(
+            id: 'actions_channel',
+            name: 'Action Notifications',
+            description: 'Notifications with interactive buttons',
+            importance: NotificationImportanceEnum.max,
+            priority: NotificationPriorityEnum.max,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+          ),
+          NotificationChannelData(
+            id: 'scheduled_channel',
+            name: 'Scheduled Notifications',
+            description: 'Scheduled notification channel',
+            importance: NotificationImportanceEnum.high,
+            priority: NotificationPriorityEnum.high,
+            playSound: true,
+            enableVibration: false,
+          ),
+        ],
+        androidNotificationIconPath: '@drawable/ic_notification',
+        senderId: '123456789012', // Replace with your actual sender ID
+        updateTokenCallback: (String fcmToken) async {
+          debugPrint('FCM Token: $fcmToken');
+          _notificationProvider.setFcmToken(fcmToken);
 
-              // In a real app, send this token to your backend
-              // For demo purposes, we'll just print it
-              return true;
-            },
-          );
+          // In a real app, send this token to your backend
+          // For demo purposes, we'll just print it
+          return true;
+        },
+      );
 
       // Handle initial notification separately (recommended approach)
-      final NotificationData? initialData = await _messagingHandler
-          .checkInitial();
+      final NotificationData? initialData =
+          await _messagingHandler.checkInitial();
       if (initialData != null) {
         _notificationProvider.setInitialNotification(initialData);
         _handleNotificationClick(initialData, isInitial: true);
@@ -147,6 +147,13 @@ class NotificationService {
         break;
     }
 
+    // Handle in-app notification templates
+    if (data.payload['in_app'] == 'true' || data.payload['in_app'] == true) {
+      final template = data.payload['template'] as String?;
+      _showInAppTemplate(data, template);
+      return;
+    }
+
     // Handle specific notification categories
     if (data.category == 'promotion') {
       _showPromotionDialog(data);
@@ -195,6 +202,64 @@ class NotificationService {
   void _showMessageDialog(NotificationData data) {
     debugPrint('Showing message dialog: ${data.title}');
     // In a real app, show message details
+  }
+
+  void _showInAppTemplate(NotificationData data, String? template) {
+    debugPrint('Showing in-app template: $template for ${data.title}');
+
+    // Show different templates based on the template type
+    switch (template) {
+      case 'welcome':
+        _showWelcomeTemplate(data);
+        break;
+      case 'promotion':
+        _showPromotionTemplate(data);
+        break;
+      case 'alert':
+        _showAlertTemplate(data);
+        break;
+      case 'success':
+        _showSuccessTemplate(data);
+        break;
+      case 'info':
+        _showInfoTemplate(data);
+        break;
+      default:
+        _showDefaultTemplate(data);
+        break;
+    }
+
+    _notificationProvider.addActivity('In-app template shown: $template');
+  }
+
+  void _showWelcomeTemplate(NotificationData data) {
+    // In a real app, show a welcome banner or modal
+    debugPrint('Welcome template: ${data.title} - ${data.body}');
+  }
+
+  void _showPromotionTemplate(NotificationData data) {
+    // In a real app, show a promotion banner with CTA
+    debugPrint('Promotion template: ${data.title} - ${data.body}');
+  }
+
+  void _showAlertTemplate(NotificationData data) {
+    // In a real app, show an alert banner
+    debugPrint('Alert template: ${data.title} - ${data.body}');
+  }
+
+  void _showSuccessTemplate(NotificationData data) {
+    // In a real app, show a success banner
+    debugPrint('Success template: ${data.title} - ${data.body}');
+  }
+
+  void _showInfoTemplate(NotificationData data) {
+    // In a real app, show an info banner
+    debugPrint('Info template: ${data.title} - ${data.body}');
+  }
+
+  void _showDefaultTemplate(NotificationData data) {
+    // In a real app, show a default banner
+    debugPrint('Default template: ${data.title} - ${data.body}');
   }
 
   // ===== DEMO METHODS FOR SHOWCASING FEATURES =====
@@ -304,4 +369,90 @@ class NotificationService {
 
   // Public accessor for messaging handler (for advanced usage)
   FirebaseMessagingHandler get messagingHandler => _messagingHandler;
+
+  // ===== IN-APP TEMPLATE DEMO METHODS =====
+
+  Future<void> triggerWelcomeTemplate() async {
+    await _messagingHandler.showNotificationWithActions(
+      title: 'Welcome to Our Notification Testing App',
+      body: 'This is a welcome template triggered from the app',
+      actions: [],
+      payload: {
+        'in_app': true,
+        'template': 'welcome',
+        'campaign': 'demo',
+        'source': 'manual_trigger',
+      },
+      channelId: 'default_channel',
+    );
+    _notificationProvider.addActivity('Triggered welcome template');
+  }
+
+  Future<void> triggerPromotionTemplate() async {
+    await _messagingHandler.showNotificationWithActions(
+      title: 'Special Offer Available!',
+      body: 'Get 50% off on all premium features',
+      actions: [],
+      payload: {
+        'in_app': true,
+        'template': 'promotion',
+        'campaign': 'demo',
+        'source': 'manual_trigger',
+        'offer_code': 'DEMO50',
+      },
+      channelId: 'default_channel',
+    );
+    _notificationProvider.addActivity('Triggered promotion template');
+  }
+
+  Future<void> triggerAlertTemplate() async {
+    await _messagingHandler.showNotificationWithActions(
+      title: 'Important Alert',
+      body: 'Please update your app to the latest version',
+      actions: [],
+      payload: {
+        'in_app': true,
+        'template': 'alert',
+        'campaign': 'demo',
+        'source': 'manual_trigger',
+        'priority': 'high',
+      },
+      channelId: 'default_channel',
+    );
+    _notificationProvider.addActivity('Triggered alert template');
+  }
+
+  Future<void> triggerSuccessTemplate() async {
+    await _messagingHandler.showNotificationWithActions(
+      title: 'Success!',
+      body: 'Your notification settings have been updated',
+      actions: [],
+      payload: {
+        'in_app': true,
+        'template': 'success',
+        'campaign': 'demo',
+        'source': 'manual_trigger',
+        'action': 'settings_updated',
+      },
+      channelId: 'default_channel',
+    );
+    _notificationProvider.addActivity('Triggered success template');
+  }
+
+  Future<void> triggerInfoTemplate() async {
+    await _messagingHandler.showNotificationWithActions(
+      title: 'Did you know?',
+      body: 'You can customize notification channels in Android settings',
+      actions: [],
+      payload: {
+        'in_app': true,
+        'template': 'info',
+        'campaign': 'demo',
+        'source': 'manual_trigger',
+        'tip': 'notification_channels',
+      },
+      channelId: 'default_channel',
+    );
+    _notificationProvider.addActivity('Triggered info template');
+  }
 }

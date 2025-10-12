@@ -26,13 +26,20 @@ const String _sampleFcmPayload = '''
   "message": {
     "token": "<device-fcm-token>",
     "notification": {
-      "title": "Welcome to FMH",
+      "title": "Welcome to Our Notification Testing App",
       "body": "Tap to open the Scenario screen"
+    },
+    "android": {
+      "notification": {
+        "channel_id": "default_channel"
+      }
     },
     "data": {
       "campaign": "showcase",
       "step": "console-push",
-      "deep_link": "app://notifications/showcase"
+      "deep_link": "app://notifications/showcase",
+      "template": "welcome",
+      "in_app": "true"
     }
   }
 }
@@ -86,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Firebase Messaging Handler Showcase'),
+        title: const Text(
+          'Firebase Messaging Handler Showcase',
+          style: TextStyle(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
@@ -175,6 +185,84 @@ class _HomeScreenState extends State<HomeScreen> {
                         body:
                             'Calls createNotificationGroup with three NotificationData instances so you can inspect '
                             'group summaries and taps inside the Scenario screen.',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                _buildFeatureSection(
+                  title: 'In-App Notification Templates',
+                  subtitle:
+                      'Trigger custom in-app templates with different styles.',
+                  features: [
+                    FeatureCard(
+                      title: 'Welcome Template',
+                      description:
+                          'Shows a welcome banner with onboarding content.',
+                      icon: Icons.waving_hand,
+                      color: Colors.green,
+                      onTap: _notificationService.triggerWelcomeTemplate,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Welcome Template',
+                        body:
+                            'Triggers an in-app welcome template that can be used for onboarding flows and user greetings.',
+                      ),
+                    ),
+                    FeatureCard(
+                      title: 'Promotion Template',
+                      description:
+                          'Displays promotional content with call-to-action.',
+                      icon: Icons.local_offer,
+                      color: Colors.orange,
+                      onTap: _notificationService.triggerPromotionTemplate,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Promotion Template',
+                        body:
+                            'Shows promotional banners with special offers and discount codes for marketing campaigns.',
+                      ),
+                    ),
+                    FeatureCard(
+                      title: 'Alert Template',
+                      description:
+                          'Highlights important alerts and urgent messages.',
+                      icon: Icons.warning,
+                      color: Colors.red,
+                      onTap: _notificationService.triggerAlertTemplate,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Alert Template',
+                        body:
+                            'Displays urgent alerts and important notifications that require immediate attention.',
+                      ),
+                    ),
+                    FeatureCard(
+                      title: 'Success Template',
+                      description:
+                          'Celebrates successful actions and confirmations.',
+                      icon: Icons.check_circle,
+                      color: Colors.lightGreen,
+                      onTap: _notificationService.triggerSuccessTemplate,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Success Template',
+                        body:
+                            'Shows success messages and confirmation banners for completed actions.',
+                      ),
+                    ),
+                    FeatureCard(
+                      title: 'Info Template',
+                      description:
+                          'Provides helpful tips and informational content.',
+                      icon: Icons.info,
+                      color: Colors.blue,
+                      onTap: _notificationService.triggerInfoTemplate,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Info Template',
+                        body:
+                            'Displays informational content, tips, and helpful guidance for users.',
                       ),
                     ),
                   ],
@@ -288,7 +376,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Welcome to your FCM Showcase',
+              'Welcome to our Notification Testing Application',
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
