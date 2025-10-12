@@ -15,19 +15,22 @@ dependencies:
     sdk: flutter
 
   # Firebase Cloud Messaging
-  firebase_messaging: ^15.1.4
+  firebase_messaging: ^15.0.0
   
   # Local notifications for scheduling and custom handling
-  flutter_local_notifications: ^18.0.0
+  flutter_local_notifications: ^17.0.0
   
   # Persistent storage for configuration and caching
   shared_preferences: ^2.0.0
-  
+
   # Web platform support
   universal_html: ^2.0.0
   
   # Timezone handling for scheduled notifications
   timezone: ^0.9.0
+  
+  # HTML widget support for rich content
+  flutter_widget_from_html_core: ^0.15.0
 
 dev_dependencies:
   flutter_test:

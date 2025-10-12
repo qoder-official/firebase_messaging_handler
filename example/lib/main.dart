@@ -11,6 +11,7 @@ import 'services/firebase_setup_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FirebaseMessagingHandler.instance.setInAppNavigatorKey(rootNavigatorKey);
 
   runApp(const MyApp());
 }
@@ -28,9 +29,7 @@ class MyApp extends StatelessWidget {
         title: 'Firebase Messaging Handler Showcase',
         theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
         navigatorKey: rootNavigatorKey,
-        home: InAppOverlayHost(
-          child: const FirebaseInitializationWrapper(),
-        ),
+        home: const FirebaseInitializationWrapper(),
         debugShowCheckedModeBanner: false,
       ),
     );

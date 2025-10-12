@@ -178,7 +178,7 @@ SPEC CHECKSUMS:
   FirebaseInstallations: 317270fec08a5d418fdbc8429282238cab3ac843
   FirebaseMessaging: 3b26e2cee503815e01c3701236b020aa9b576f09
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_local_notifications: df98d66e515e1ca797af436137b4459b160ad8c9
+  flutter_local_notifications: 4cde75091f6327eb8517fa068a0a5950212d2086
   GoogleAdsOnDeviceConversion: 2be6297a4f048459e0ae17fad9bfd2844e10cf64
   GoogleAppMeasurement: 700dce7541804bec33db590a5c496b663fbe2539
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
@@ -188,6 +188,6 @@ SPEC CHECKSUMS:
   shared_preferences_foundation: fcdcbc04712aee1108ac7fda236f363274528f78
   url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
 
-PODFILE CHECKSUM: 251cb053df7158f337c0712f2ab29f4e0fa474ce
+PODFILE CHECKSUM: 3f7446fb3fb95a396189cbf79674fb0076337684
 
 COCOAPODS: 1.16.2

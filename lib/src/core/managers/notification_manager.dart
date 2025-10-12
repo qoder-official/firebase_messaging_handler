@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../services/export.dart';
 import 'in_app_message_manager.dart';
@@ -439,6 +440,11 @@ class NotificationManager {
   void setInAppFallbackDisplayHandler(
       InAppNotificationDisplayCallback? fallback) {
     _inAppMessageManager.setFallbackDisplayHandler(fallback);
+  }
+
+  /// Sets the navigator key used for in-app template presentation.
+  void setInAppNavigatorKey(GlobalKey<NavigatorState> navigatorKey) {
+    _inAppMessageManager.setNavigatorKey(navigatorKey);
   }
 
   /// Provides stream of in-app messages triggered by data-only pushes

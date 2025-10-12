@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
@@ -364,18 +366,20 @@ class NotificationService {
   Future<void> triggerVersionPromptDemo() async {
     final now = DateTime.now();
     final content = {
+      'layout': 'dialog',
       'title': 'Update available',
       'message':
           'Version 2.0 is live with background delivery controls and new analytics hooks.',
       'primaryLabel': 'View release notes',
       'secondaryLabel': 'Remind me later',
       'dismissLabel': 'Skip this version',
-      'deepLink': 'app://releases/2.0',
+      'imageUrl':
+          'https://via.placeholder.com/600x320/111827/ffffff?text=Version+2.0',
     };
 
     final data = InAppNotificationData(
       id: 'version_prompt_${now.millisecondsSinceEpoch}',
-      templateId: 'builtin_version_prompt',
+      templateId: 'builtin_generic',
       triggerType: InAppTriggerTypeEnum.immediate,
       content: content,
       analytics: {
@@ -383,7 +387,7 @@ class NotificationService {
         'campaign': 'showcase_version_prompt',
       },
       rawPayload: {
-        'templateId': 'builtin_version_prompt',
+        'templateId': 'builtin_generic',
         'content': content,
       },
       receivedAt: now,
@@ -395,6 +399,69 @@ class NotificationService {
 
   void openScenarioFromTimeline(NotificationData data) {
     _navigateToScreen(data);
+  }
+
+  Future<void> triggerTemplateFromJson(String source) async {
+    try {
+      final decoded = jsonDecode(source) as Map<String, dynamic>;
+      final data = _mapToInAppData(decoded);
+      await _inAppMessageManager.triggerInAppNotification(data);
+      _notificationProvider
+          .addActivity('Triggered ${data.templateId} template manually');
+    } catch (error, stack) {
+      debugPrint('Error triggering template: $error');
+      debugPrint('$stack');
+      rethrow;
+    }
+  }
+
+  InAppNotificationData _mapToInAppData(Map<String, dynamic> map) {
+    if (map.containsKey('message')) {
+      // FCM message format
+      final data = Map<String, dynamic>.from(
+          map['message']['data'] as Map? ?? <String, dynamic>{});
+      if (data.containsKey('fcmh_inapp')) {
+        final payloadString = data['fcmh_inapp'] as String;
+        try {
+          final payload = jsonDecode(payloadString) as Map<String, dynamic>;
+          return _mapToInAppData(payload);
+        } catch (e) {
+          debugPrint('Failed to decode fcmh_inapp payload: $e');
+        }
+      }
+      map = data;
+    }
+
+    final content = Map<String, dynamic>.from(
+        map['content'] as Map? ?? <String, dynamic>{});
+    final analytics = Map<String, dynamic>.from(
+        map['analytics'] as Map? ?? <String, dynamic>{});
+    final rawPayload = Map<String, dynamic>.from(
+        map['rawPayload'] as Map? ?? <String, dynamic>{});
+
+    final triggerString = (map['trigger'] ?? map['triggerType']) as String?;
+    final trigger = InAppTriggerTypeEnum.fromString(triggerString);
+
+    final id = (map['id'] ??
+            map['messageId'] ??
+            'template_${DateTime.now().millisecondsSinceEpoch}')
+        .toString();
+    final templateId =
+        (map['templateId'] ?? map['template'] ?? 'builtin_generic').toString();
+
+    final receivedAtString = map['receivedAt'] as String?;
+    final receivedAt =
+        receivedAtString != null ? DateTime.tryParse(receivedAtString) : null;
+
+    return InAppNotificationData(
+      id: id,
+      templateId: templateId,
+      triggerType: trigger,
+      content: content,
+      analytics: analytics,
+      rawPayload: rawPayload,
+      receivedAt: receivedAt ?? DateTime.now(),
+    );
   }
 
   Future<String?> getCurrentFcmToken() async {

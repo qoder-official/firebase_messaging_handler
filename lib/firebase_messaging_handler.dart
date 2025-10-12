@@ -4,6 +4,7 @@ import 'dart:async';
 import 'src/export.dart';
 import 'src/core/export.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/widgets.dart';
 export 'src/enums/export.dart';
 export 'src/models/export.dart';
 export 'src/core/export.dart';
@@ -524,5 +525,10 @@ class FirebaseMessagingHandler {
   /// Clears stored in-app notifications. Optionally target a single message by ID.
   Future<void> clearPendingInAppNotifications({String? id}) async {
     await _notificationManager.clearPendingInAppMessages(id: id);
+  }
+
+  /// Configures the navigator key used for advanced in-app template presentation.
+  void setInAppNavigatorKey(GlobalKey<NavigatorState> navigatorKey) {
+    _notificationManager.setInAppNavigatorKey(navigatorKey);
   }
 }

@@ -1,6 +1,6 @@
 # Firebase Messaging Handler Plugin
 
-> **🎯 One-Stop Solution for Firebase Cloud Messaging** - Handle everything from basic notifications to advanced features like scheduling, actions, and analytics. Zero breaking changes, maximum flexibility!
+> **🎯 One-Stop Push & In-App Messaging for Firebase Cloud Messaging** – Handle everything from reliable click streams to scheduling, actions, quiet hours, and rich in-app templates. Zero breaking changes, maximum flexibility!
 
 [![pub package](https://img.shields.io/pub/v/firebase_messaging_handler.svg)](https://pub.dev/packages/firebase_messaging_handler)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -378,6 +378,7 @@ The `example/` directory doubles as an FCM showcase powered entirely by this plu
 - **Power utilities** – update badges, register custom sound channels, and clear demo data while analytics events stream in.
 - **Scenario detail screen** – every notification routes to a dedicated inspector showing payloads, actions, badges, and metadata.
 - **Activity timeline** – watch a running log of everything the handler does (initialization, scheduling, clears, custom actions).
+- **Template playground** – paste sample silent payloads to preview the generic template renderer in real time.
 
 Run `flutter run` inside `example/` to explore the full experience.
 
@@ -761,53 +762,57 @@ Supported triggers:
 
 Use `clearPendingInAppNotifications()` to drop queued payloads (optionally targeting a specific `id`).
 
-### **Built-in Templates & Overlay Host**
+### **Built-in Templates & Overlay Support**
 
-Wrap your app with `InAppOverlayHost` to let the handler show rich templates:
+Provide a navigator key so the handler can present rich layouts:
 
 ```dart
-return InAppOverlayHost(
-  child: MaterialApp(
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  FirebaseMessagingHandler.instance.setInAppNavigatorKey(rootNavigatorKey);
+  runApp(MaterialApp(
     navigatorKey: rootNavigatorKey,
     home: const ShowcaseHome(),
-  ),
-);
-```
-
-Register a built-in template (e.g. version prompt dialog) and track actions:
-
-```dart
-@override
-void didChangeDependencies() {
-  super.didChangeDependencies();
-  final overlay = InAppOverlayHost.maybeOf(context);
-  if (overlay != null && !_templatesRegistered) {
-    FirebaseMessagingHandler.instance.registerInAppNotificationTemplates({
-      'builtin_version_prompt': BuiltInInAppTemplates.versionPrompt(
-        controller: overlay,
-        onAction: (actionId, data) {
-          debugPrint('Version prompt action: $actionId');
-        },
-      ),
-    });
-    _templatesRegistered = true;
-  }
+  ));
 }
 ```
 
-Trigger the dialog manually or via a silent payload:
+Register the generic template and handle button callbacks:
+
+```dart
+void _registerTemplates() {
+  FirebaseMessagingHandler.instance.registerInAppNotificationTemplates({
+    'builtin_generic': BuiltInInAppTemplates.generic(
+      onAction: (actionId, data) {
+        debugPrint('Template action: $actionId payload=${data.payload}');
+      },
+    ),
+  });
+}
+```
+
+Trigger locally (useful for testing) or remotely via a silent FCM payload:
 
 ```dart
 InAppMessageManager.instance.triggerInAppNotification(
   InAppNotificationData(
     id: 'demo_${DateTime.now().millisecondsSinceEpoch}',
-    templateId: 'builtin_version_prompt',
+    templateId: 'builtin_generic',
     triggerType: InAppTriggerTypeEnum.immediate,
     content: {
+      'layout': 'dialog',
       'title': 'Update available',
       'message': 'Version 2.0 adds quiet hours and campaign caps.',
       'primaryLabel': 'View changelog',
       'secondaryLabel': 'Remind me later',
+      'blurSigma': 16,
+      'cornerRadius': 20,
+      'buttons': [
+        {'id': 'primary', 'label': 'View changelog', 'style': 'filled'},
+        {'id': 'later', 'label': 'Maybe later', 'style': 'outlined', 'dismissOnly': true}
+      ],
     },
     analytics: {'source': 'docs_demo'},
     rawPayload: const {},
@@ -815,6 +820,20 @@ InAppMessageManager.instance.triggerInAppNotification(
   ),
 );
 ```
+
+Supported layouts include `dialog`, `full_screen`, `bottom_sheet`, `banner`, `tooltip`, `carousel`, and `snackbar`. Configure blur, barrier color, size factors, button styles, and HTML content directly from the payload.
+
+Key payload fields:
+
+- `layout`: dialog | full_screen | bottom_sheet | banner | snackbar
+- `widthFactor` / `heightFactor`: fractions of the screen size (dialog + full screen)
+- `blurSigma` & `barrierColor`: backdrop styling for dialogs/full screens
+- `backgroundColor` / `textColor`: hex (`#RRGGBB` or `#AARRGGBB`) or RGB maps
+- `html`: optional HTML body rendered with `flutter_widget_from_html_core`
+- `buttons`: array of `{ id, label, style (filled|outlined|text|link), dismissOnly }`
+- `autoDismissSeconds`: auto-dismiss duration for banners/snackbars
+- `position`: `top` or `bottom` for banner layout
+- `pages`: list of page maps (carousel) each supporting `title`, `body`, `html`, `imageUrl`, and `buttons`
 
 ## 🛡️ **Foreground Notification Customization**
 

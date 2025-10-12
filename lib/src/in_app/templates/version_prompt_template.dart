@@ -51,6 +51,34 @@ class BuiltInInAppTemplates {
     );
   }
 
+  static InAppNotificationTemplate generic({
+    InAppTemplateActionCallback? onAction,
+  }) {
+    return InAppNotificationTemplate(
+      id: 'builtin_generic',
+      description:
+          'Generic template for various layouts (dialog, banner, bottom sheet, tooltip, carousel)',
+      autoDismissDuration: null,
+      onDisplay: (data) {
+        // For now, we'll use a simple dialog as the default
+        // In a full implementation, this would parse the layout type
+        // and show the appropriate UI component
+        final content = data.content;
+        final layout = content['layout'] as String? ?? 'dialog';
+
+        // This is a placeholder - the actual implementation would need
+        // access to the overlay controller and context
+        // For now, we'll just log that the template was triggered
+        debugPrint(
+            '[BuiltInInAppTemplates] Generic template triggered with layout: $layout');
+        debugPrint('[BuiltInInAppTemplates] Content: $content');
+
+        // Call the action callback if provided
+        onAction?.call('generic_triggered', data);
+      },
+    );
+  }
+
   static bool _resolveDismissible(
     InAppNotificationData data,
     VersionPromptTemplateConfig config,

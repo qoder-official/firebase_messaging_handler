@@ -38,10 +38,116 @@ const String _sampleFcmPayload = '''
 }
 ''';
 
+const Map<String, String> _templateSamples = {
+  'Version Prompt Dialog': '''
+{
+  "id": "demo-version",
+  "templateId": "builtin_generic",
+  "trigger": "immediate",
+  "content": {
+    "layout": "dialog",
+    "title": "Update available",
+    "subtitle": "Version 2.0 ships with quiet hours",
+    "body": "Install the latest build to unlock throttling controls and background listeners.",
+    "imageUrl": "https://via.placeholder.com/600x320/111827/ffffff?text=Version+2.0",
+    "buttons": [
+      {"id": "primary", "label": "View changelog", "style": "filled"},
+      {"id": "secondary", "label": "Remind me later", "style": "outlined", "dismissOnly": true}
+    ],
+    "blurSigma": 18,
+    "barrierColor": "#33000000"
+  }
+}
+''',
+  'Promo Banner': '''
+{
+  "id": "demo-banner",
+  "templateId": "builtin_generic",
+  "trigger": "immediate",
+  "content": {
+    "layout": "banner",
+    "position": "top",
+    "title": "Flash Sale",
+    "body": "Upgrade to Pro in the next 30 minutes and save 50%.",
+    "backgroundColor": "#111827",
+    "textColor": "#F9FAFB",
+    "autoDismissSeconds": 6,
+    "buttons": [
+      {"id": "cta", "label": "View offer", "style": "filled"}
+    ]
+  }
+}
+''',
+  'Survey Bottom Sheet': '''
+{
+  "id": "demo-bottom-sheet",
+  "templateId": "builtin_generic",
+  "trigger": "immediate",
+  "content": {
+    "layout": "bottom_sheet",
+    "title": "How are we doing?",
+    "html": "<p>We are rolling out background delivery controls. Tell us how excited you are!</p>",
+    "buttons": [
+      {"id": "love_it", "label": "Love it", "style": "filled"},
+      {"id": "needs_work", "label": "Needs work", "style": "text"}
+    ]
+  }
+}
+''',
+  'Tooltip Tip': '''
+{
+  "id": "demo-tooltip",
+  "templateId": "builtin_generic",
+  "trigger": "immediate",
+  "content": {
+    "layout": "tooltip",
+    "position": "bottom",
+    "title": "Pro tip",
+    "body": "Long-press a notification in the timeline to jump to the detail inspector.",
+    "backgroundColor": "#1E293B",
+    "buttons": [
+      {"id": "dismiss", "label": "Got it", "style": "text", "dismissOnly": true}
+    ],
+    "autoDismissSeconds": 5
+  }
+}
+''',
+  'Carousel Survey': '''
+{
+  "id": "demo-carousel",
+  "templateId": "builtin_generic",
+  "trigger": "immediate",
+  "content": {
+    "layout": "carousel",
+    "pages": [
+      {
+        "title": "Quiet hours",
+        "body": "We are preparing quiet-hour controls. Would you use them?",
+        "imageUrl": "https://via.placeholder.com/600x320/0F172A/ffffff?text=Quiet+Hours",
+        "buttons": [
+          {"id": "yes", "label": "Absolutely", "style": "filled"},
+          {"id": "later", "label": "Tell me later", "style": "outlined", "dismissOnly": true}
+        ]
+      },
+      {
+        "title": "Background actions",
+        "body": "How important is handling notification actions while the app is killed?",
+        "buttons": [
+          {"id": "critical", "label": "Critical", "style": "filled"},
+          {"id": "nice_to_have", "label": "Nice to have", "style": "text"}
+        ]
+      }
+    ]
+  }
+}
+'''
+};
+
 class _HomeScreenState extends State<HomeScreen> {
   late example.NotificationService _notificationService;
-  InAppOverlayController? _overlayController;
   bool _templatesRegistered = false;
+  late TextEditingController _templateController;
+  String _selectedTemplate = _templateSamples.keys.first;
 
   @override
   void initState() {
@@ -50,17 +156,10 @@ class _HomeScreenState extends State<HomeScreen> {
       Provider.of<NotificationProvider>(context, listen: false),
       rootNavigatorKey,
     );
+    _templateController =
+        TextEditingController(text: _templateSamples[_selectedTemplate]);
     _initializeNotifications();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final controller = InAppOverlayHost.maybeOf(context);
-    if (controller != null && controller != _overlayController) {
-      _overlayController = controller;
-      _registerInAppTemplates();
-    }
+    _registerInAppTemplates();
   }
 
   Future<void> _initializeNotifications() async {
@@ -89,16 +188,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _registerInAppTemplates() {
-    if (_templatesRegistered || _overlayController == null) {
+    if (_templatesRegistered) {
       return;
     }
 
     FirebaseMessagingHandler.instance.registerInAppNotificationTemplates({
-      'builtin_version_prompt': BuiltInInAppTemplates.versionPrompt(
-        controller: _overlayController!,
+      'builtin_generic': BuiltInInAppTemplates.generic(
         onAction: (actionId, data) {
           Provider.of<NotificationProvider>(context, listen: false)
-              .addActivity('Version prompt action: $actionId');
+              .addActivity('Template action: $actionId');
         },
       ),
     });
@@ -109,6 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _notificationService.dispose();
+    _templateController.dispose();
     super.dispose();
   }
 
@@ -294,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           'Built-in dialog template for app update prompts.',
                       icon: Icons.system_update,
                       color: Colors.indigo,
-                      onTap: _triggerVersionPrompt,
+                      onTap: _notificationService.triggerVersionPromptDemo,
                       onInfoTap: () => _showFeatureInfo(
                         context,
                         title: 'Version Prompt Template',
@@ -403,6 +502,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 32),
+                _buildTemplatePlayground(provider),
                 const SizedBox(height: 32),
                 _buildNotificationStream(context, provider),
                 const SizedBox(height: 28),
@@ -802,6 +903,92 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildTemplatePlayground(NotificationProvider provider) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Template Playground',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Simulate silent FCM payloads and preview dialog, banner, bottom sheet, tooltip, and carousel layouts.',
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedTemplate,
+                    decoration: const InputDecoration(
+                      labelText: 'Sample payload',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _templateSamples.keys
+                        .map(
+                          (name) => DropdownMenuItem(
+                            value: name,
+                            child: Text(name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _selectedTemplate = value;
+                        _templateController.text =
+                            _templateSamples[value] ?? _templateController.text;
+                      });
+                    },
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Reset sample',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    setState(() {
+                      _templateController.text =
+                          _templateSamples[_selectedTemplate] ?? '';
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _templateController,
+              maxLines: 12,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Template JSON',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _triggerTemplateFromJson,
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Trigger Template'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tip: these samples map directly to the payload structure described in the README.',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _copyFcmToken(BuildContext context, String? token) async {
     if (token == null) {
       return;
@@ -988,49 +1175,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _triggerVersionPrompt() {
-    if (_overlayController == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('InAppOverlayHost not available'),
-          duration: Duration(seconds: 2),
-        ),
+  Future<void> _triggerTemplateFromJson() async {
+    try {
+      await _notificationService.triggerTemplateFromJson(
+        _templateController.text,
       );
-      return;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Template triggered successfully.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Template trigger failed: $error')),
+      );
     }
-
-    // Trigger the version prompt template manually
-    FirebaseMessagingHandler.instance
-        .getInAppNotificationStream()
-        .listen((data) {
-      // This would normally be triggered by a silent push
-      // For demo purposes, we'll trigger it manually
-    });
-
-    // For demo, we'll trigger it directly using the InAppMessageManager
-    InAppMessageManager.instance.triggerInAppNotification(
-      InAppNotificationData(
-        id: 'demo_version_prompt_${DateTime.now().millisecondsSinceEpoch}',
-        templateId: 'builtin_version_prompt',
-        triggerType: InAppTriggerTypeEnum.immediate,
-        content: {
-          'title': 'Update Available',
-          'message':
-              'Version 2.0 adds quiet hours and campaign caps. Update now to enjoy the latest features!',
-          'primaryLabel': 'Update Now',
-          'secondaryLabel': 'Remind Me Later',
-          'dismissLabel': 'Maybe Later',
-          'imageUrl':
-              'https://via.placeholder.com/400x225/6366f1/ffffff?text=Version+2.0',
-        },
-        analytics: {'source': 'demo_manual_trigger'},
-        rawPayload: const {},
-        receivedAt: DateTime.now(),
-      ),
-    );
-
-    Provider.of<NotificationProvider>(context, listen: false)
-        .addActivity('Triggered version prompt template');
   }
 }
 

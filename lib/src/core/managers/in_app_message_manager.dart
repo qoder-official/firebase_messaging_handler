@@ -3,10 +3,12 @@ import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../services/export.dart';
 import '../../enums/export.dart';
 import '../../models/export.dart';
+import '../../in_app/presentation/template_presenter.dart';
 
 class InAppMessageManager {
   static InAppMessageManager? _instance;
@@ -68,6 +70,10 @@ class InAppMessageManager {
   void setFallbackDisplayHandler(
       InAppNotificationDisplayCallback? fallbackDisplay) {
     _fallbackDisplay = fallbackDisplay;
+  }
+
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    InAppTemplatePresenter.instance.configure(navigatorKey: key);
   }
 
   Future<void> handleRemoteMessage(RemoteMessage message) async {
