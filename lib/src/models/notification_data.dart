@@ -1,4 +1,4 @@
-import '../enums/index.dart';
+import '../enums/export.dart';
 
 class NotificationAction {
   final String id;

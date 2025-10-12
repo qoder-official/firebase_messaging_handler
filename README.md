@@ -9,10 +9,13 @@
 
 - [🚀 Quick Start](#-quick-start)
 - [✨ Key Features](#-key-features)
+- [🧰 What You Get](#-what-you-get)
 - [📦 Installation](#-installation)
 - [🔧 Setup](#-setup)
 - [📖 Usage Examples](#-usage-examples)
 - [🎛️ Advanced Features](#️-advanced-features)
+- [🪄 In-App Messaging](#-in-app-messaging)
+- [🛡️ Foreground Notification Customization](#-foreground-notification-customization)
 - [📊 Analytics Integration](#-analytics-integration)
 - [🧪 Testing Utilities](#-testing-utilities)
 - [📚 API Reference](#-api-reference)
@@ -73,6 +76,18 @@ clickStream?.listen((NotificationData? data) {
 - **🔊 Custom Sound Support** - Platform-specific sound customization
 - **📊 Built-in Analytics** - Track all notification events automatically
 - **🧪 Testing Utilities** - Mock data and streams for comprehensive testing
+- **🪄 In-App Messaging** - Trigger rich in-app templates from silent FCM payloads
+- **🛡️ Foreground Controls** - Fully customize fallback foreground notifications
+
+## 🧰 **What You Get**
+
+Your app starts simple and scales only when you opt in. Every capability ships with safe defaults and a straightforward toggle.
+
+- **Core (always on)**: unified click stream, terminated-notification getter, token lifecycle management, platform badge helpers.
+- **Optional power-ups**: scheduling, recurring rules, grouping, custom sounds, analytics callbacks, in-app templates, foreground overrides, mock/testing utilities.
+- **Zero extra deps**: the plugin bundles `firebase_messaging` for you—add one dependency and you are ready for push, scheduling, analytics, and in-app flows.
+- **Progressive adoption**: wire up the click stream today, add interactive actions or in-app templates later without touching existing code.
+- **Configuration-at-callsite**: all advanced APIs expose per-call parameters so you can tailor a single notification without changing global settings.
 
 ### **🏗️ Architecture Benefits**
 - **🔧 Modular Design** - Clean separation of concerns
@@ -657,6 +672,135 @@ await FirebaseMessagingHandler.instance.createCustomSoundChannel(
 // Get available sounds (iOS)
 final List<String>? sounds = await FirebaseMessagingHandler.instance.getAvailableSounds();
 ```
+
+## 🪄 **In-App Messaging**
+
+Deliver rich in-app experiences using silent/data-only FCM payloads that map to reusable templates.
+
+### **Register Templates**
+
+```dart
+FirebaseMessagingHandler.instance.registerInAppNotificationTemplates({
+  'promo_banner': InAppNotificationTemplate(
+    id: 'promo_banner',
+    description: 'Lightweight promotional banner',
+    onDisplay: (inAppData) {
+      inAppOverlayController.showBanner(
+        title: inAppData.content['title'] as String?,
+        body: inAppData.content['body'] as String?,
+        imageUrl: inAppData.content['image'] as String?,
+        ctaLabel: inAppData.content['cta_label'] as String?,
+        deeplink: inAppData.content['deeplink'] as String?,
+      );
+    },
+  ),
+});
+
+FirebaseMessagingHandler.instance.setInAppFallbackDisplayHandler((payload) {
+  debugPrint('Unhandled in-app template: ${payload.templateId}');
+});
+```
+
+### **Listen for Ready Messages**
+
+```dart
+FirebaseMessagingHandler.instance
+    .getInAppNotificationStream()
+    .listen((inAppData) {
+  inAppLogger.debug('Render template ${inAppData.templateId}');
+  campaignAnalytics.track('in_app_impression', inAppData.analytics);
+});
+```
+
+Need to hydrate pending payloads after a cold start? Call:
+
+```dart
+await FirebaseMessagingHandler.instance.flushPendingInAppNotifications();
+```
+
+### **Sample FCM Payload**
+
+```json
+{
+  "message": {
+    "token": "{{deviceToken}}",
+    "data": {
+      "fcmh_inapp": "{ \"id\": \"winter_sale_2025\", \"templateId\": \"promo_banner\", \"trigger\": \"immediate\", \"content\": { \"title\": \"Winter Sale\", \"body\": \"Take 25% off today only\", \"cta_label\": \"Shop now\", \"deeplink\": \"app://store/sale\" }, \"analytics\": { \"campaignId\": \"winter_flash\", \"variant\": \"A\" } }"
+    }
+  }
+}
+```
+
+Supported triggers:
+
+- `immediate` → render as soon as the payload arrives (foreground or via queued stream)
+- `next_foreground` → store until the next time you listen to the stream
+- `app_launch` → store until `flushPendingInAppNotifications` is called
+- `custom` → surface the payload immediately and let the host decide when to display
+
+Use `clearPendingInAppNotifications()` to drop queued payloads (optionally targeting a specific `id`).
+
+## 🛡️ **Foreground Notification Customization**
+
+Own the fallback notification UI that appears while your app is active.
+
+### **Override Once, Anywhere**
+
+```dart
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+FirebaseMessagingHandler.instance.setForegroundNotificationOptions(
+  ForegroundNotificationOptions(
+    androidBuilder: (context) {
+      final imageAsset = context.data['image_asset'] as String?;
+      if (imageAsset != null) {
+        return AndroidNotificationDetails(
+          'promo_channel',
+          'Promotions',
+          channelDescription: 'Foreground promos',
+          importance: Importance.max,
+          priority: Priority.high,
+          styleInformation: BigPictureStyleInformation(
+            DrawableResourceAndroidBitmap(imageAsset),
+            largeIcon: DrawableResourceAndroidBitmap(imageAsset),
+          ),
+        );
+      }
+      return const AndroidNotificationDetails(
+        'default_channel',
+        'Default Notifications',
+        importance: Importance.max,
+        priority: Priority.high,
+      );
+    },
+    iosBuilder: (context) {
+      final imageName = context.data['image_asset'] as String?;
+      if (imageName == null) {
+        return const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          presentBadge: true,
+        );
+      }
+
+      return DarwinNotificationDetails(
+        presentAlert: true,
+        presentSound: true,
+        presentBadge: true,
+        attachments: [
+          DarwinNotificationAttachment('resource:///$imageName'),
+        ],
+      );
+    },
+  ),
+);
+```
+
+The builders receive the real `RemoteMessage`, so you can map any data payload to advanced styles, media, icons, or badges. Return `null` to fall back to the plugin defaults, or set `enabled: false` to suppress the automatic notification entirely when you prefer a custom in-app surface.
+
+Prefer static overrides? Use `androidDefaults` / `iosDefaults` to plug in prebuilt `AndroidNotificationDetails` or `DarwinNotificationDetails` instances without writing builders.
+
+> ℹ️ Use `DrawableResourceAndroidBitmap`, `ByteArrayAndroidBitmap`, or `FilePathAndroidBitmap` depending on where your assets live. For iOS, `DarwinNotificationAttachment` expects a local resource URI—download remote media before attaching it.
 
 ## 📊 **Analytics Integration**
 

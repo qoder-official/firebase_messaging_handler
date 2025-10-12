@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'dart:ui';
-import 'package:firebase_messaging_handler/src/enums/index.dart';
-import 'package:firebase_messaging_handler/src/extensions/index.dart';
-import 'package:firebase_messaging_handler/src/models/index.dart';
+import 'package:firebase_messaging_handler/src/enums/export.dart';
+import 'package:firebase_messaging_handler/src/extensions/export.dart';
+import 'package:firebase_messaging_handler/src/models/export.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationChannelData {

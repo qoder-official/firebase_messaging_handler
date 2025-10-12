@@ -1,12 +1,12 @@
 library firebase_messaging_handler;
 
 import 'dart:async';
-import 'src/index.dart';
-import 'src/core/index.dart';
+import 'src/export.dart';
+import 'src/core/export.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-export 'src/enums/index.dart';
-export 'src/models/index.dart';
-export 'src/core/index.dart';
+export 'src/enums/export.dart';
+export 'src/models/export.dart';
+export 'src/core/export.dart';
 
 /// A comprehensive Firebase Cloud Messaging handler for Flutter applications.
 ///
@@ -479,5 +479,49 @@ class FirebaseMessagingHandler {
   /// or FCM operations.
   void trackAnalyticsEvent(String event, Map<String, dynamic> data) {
     _notificationManager.trackAnalyticsEvent(event, data);
+  }
+
+  /// Overrides default foreground notification presentation behavior.
+  ///
+  /// Use this to inject rich styles (images, large icons, attachments) or
+  /// disable the automatic fallback notification entirely.
+  void setForegroundNotificationOptions(ForegroundNotificationOptions options) {
+    _notificationManager.setForegroundNotificationOptions(options);
+  }
+
+  /// Registers in-app notification templates that can be invoked by silent pushes.
+  void registerInAppNotificationTemplates(
+      Map<String, InAppNotificationTemplate> templates) {
+    _notificationManager.registerInAppTemplates(templates);
+  }
+
+  /// Clears all registered in-app templates.
+  void clearInAppNotificationTemplates() {
+    _notificationManager.clearInAppTemplates();
+  }
+
+  /// Sets a fallback handler for in-app payloads that reference unknown templates.
+  void setInAppFallbackDisplayHandler(
+      InAppNotificationDisplayCallback? fallbackHandler) {
+    _notificationManager.setInAppFallbackDisplayHandler(fallbackHandler);
+  }
+
+  /// Exposes stream of in-app notification payloads ready to be rendered.
+  Stream<InAppNotificationData> getInAppNotificationStream({
+    bool includePendingStorageItems = true,
+  }) {
+    return _notificationManager.getInAppMessageStream(
+      includePendingStorageItems: includePendingStorageItems,
+    );
+  }
+
+  /// Flushes any stored in-app notifications (e.g. delivered while app was backgrounded).
+  Future<void> flushPendingInAppNotifications() async {
+    await _notificationManager.flushPendingInAppMessages();
+  }
+
+  /// Clears stored in-app notifications. Optionally target a single message by ID.
+  Future<void> clearPendingInAppNotifications({String? id}) async {
+    await _notificationManager.clearPendingInAppMessages(id: id);
   }
 }
