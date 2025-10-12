@@ -571,11 +571,15 @@ class NotificationManager {
     try {
       final AndroidNotificationDetails? androidOverride =
           await _resolveAndroidForegroundDetails(message);
-      if (message.notification?.android?.channelId != null) {
-        AndroidNotificationChannel? selectedChannel;
 
+      // Determine channel ID - use provided one or fall back to first available channel
+      String? channelId = message.notification?.android?.channelId;
+      AndroidNotificationChannel? selectedChannel;
+
+      if (channelId != null) {
+        // Look for the specified channel
         for (final NotificationChannelData channelData in androidChannels) {
-          if (channelData.id == message.notification!.android!.channelId) {
+          if (channelData.id == channelId) {
             selectedChannel = channelData.toAndroidNotificationChannel();
             break;
           }
@@ -583,18 +587,31 @@ class NotificationManager {
 
         if (selectedChannel == null) {
           _logMessage(
-              '[NotificationManager] Channel ID not found: ${message.notification?.android?.channelId}');
-          return;
+              '[NotificationManager] Channel ID not found: $channelId, falling back to default');
+          channelId = null; // Will fall back to default
         }
+      }
 
+      // Fall back to first available channel if no channel specified or found
+      if (channelId == null && androidChannels.isNotEmpty) {
+        channelId = androidChannels.first.id;
+        selectedChannel = androidChannels.first.toAndroidNotificationChannel();
+        _logMessage('[NotificationManager] Using default channel: $channelId');
+      }
+
+      // Show notification if we have a valid channel
+      if (channelId != null) {
         await _notificationService.showNotification(
           id: message.notification.hashCode,
           title: message.notification?.title ?? '',
           body: message.notification?.body ?? '',
           payload: message.data,
-          channelId: message.notification?.android?.channelId,
+          channelId: channelId,
           androidDetailsOverride: androidOverride,
         );
+      } else {
+        _logMessage(
+            '[NotificationManager] No Android channels available for notification');
       }
     } catch (error, stack) {
       _logMessage(

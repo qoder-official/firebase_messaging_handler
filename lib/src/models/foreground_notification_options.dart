@@ -42,5 +42,23 @@ class ForegroundNotificationOptions {
   });
 
   static const ForegroundNotificationOptions defaults =
-      ForegroundNotificationOptions();
+      ForegroundNotificationOptions(
+    enabled: true,
+    androidDefaults: AndroidNotificationDetails(
+      'default_channel',
+      'Default Notifications',
+      channelDescription:
+          'Default notification channel for foreground messages',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+      enableVibration: true,
+      playSound: true,
+    ),
+    iosDefaults: DarwinNotificationDetails(
+      presentAlert: true,
+      presentSound: true,
+      presentBadge: true,
+    ),
+  );
 }
