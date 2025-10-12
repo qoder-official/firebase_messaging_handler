@@ -1,6 +1,7 @@
 import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
+
 import '../providers/notification_provider.dart';
 import '../screens/scenario_screen.dart';
 
@@ -17,6 +18,7 @@ class NotificationService {
       FirebaseMessagingHandler.instance;
   final NotificationProvider _notificationProvider;
   final GlobalKey<NavigatorState> _navigatorKey;
+  final InAppMessageManager _inAppMessageManager = InAppMessageManager.instance;
 
   NotificationService(this._notificationProvider, this._navigatorKey);
 
@@ -357,6 +359,42 @@ class NotificationService {
     _notificationProvider.clearAll();
     await _messagingHandler.clearBadgeCount();
     _notificationProvider.addActivity('Cleared scheduled notifications');
+  }
+
+  Future<void> triggerVersionPromptDemo() async {
+    final now = DateTime.now();
+    final content = {
+      'title': 'Update available',
+      'message':
+          'Version 2.0 is live with background delivery controls and new analytics hooks.',
+      'primaryLabel': 'View release notes',
+      'secondaryLabel': 'Remind me later',
+      'dismissLabel': 'Skip this version',
+      'deepLink': 'app://releases/2.0',
+    };
+
+    final data = InAppNotificationData(
+      id: 'version_prompt_${now.millisecondsSinceEpoch}',
+      templateId: 'builtin_version_prompt',
+      triggerType: InAppTriggerTypeEnum.immediate,
+      content: content,
+      analytics: {
+        'source': 'example_demo',
+        'campaign': 'showcase_version_prompt',
+      },
+      rawPayload: {
+        'templateId': 'builtin_version_prompt',
+        'content': content,
+      },
+      receivedAt: now,
+    );
+
+    await _inAppMessageManager.triggerInAppNotification(data);
+    _notificationProvider.addActivity('Triggered version prompt template');
+  }
+
+  void openScenarioFromTimeline(NotificationData data) {
+    _navigateToScreen(data);
   }
 
   Future<String?> getCurrentFcmToken() async {

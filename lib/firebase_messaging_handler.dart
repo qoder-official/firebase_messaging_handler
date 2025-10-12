@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 export 'src/enums/export.dart';
 export 'src/models/export.dart';
 export 'src/core/export.dart';
+export 'src/in_app/export.dart';
 
 /// A comprehensive Firebase Cloud Messaging handler for Flutter applications.
 ///

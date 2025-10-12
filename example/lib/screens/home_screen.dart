@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/notification_provider.dart';
 import '../router/app_router.dart';
-import '../screens/timeline_details_screen.dart';
 import '../services/notification_service.dart' as example;
 import '../services/firebase_setup_service.dart';
 import '../widgets/notification_card.dart';
@@ -26,20 +25,14 @@ const String _sampleFcmPayload = '''
   "message": {
     "token": "<device-fcm-token>",
     "notification": {
-      "title": "Welcome to Our Notification Testing App",
+      "title": "Welcome to FMH",
       "body": "Tap to open the Scenario screen"
-    },
-    "android": {
-      "notification": {
-        "channel_id": "default_channel"
-      }
     },
     "data": {
       "campaign": "showcase",
       "step": "console-push",
       "deep_link": "app://notifications/showcase",
-      "template": "welcome",
-      "in_app": "true"
+      "fcmh_inapp": "{\\"id\\":\\"version_prompt_demo\\",\\"templateId\\":\\"builtin_version_prompt\\",\\"trigger\\":\\"immediate\\",\\"content\\":{\\"title\\":\\"Update ready\\",\\"message\\":\\"Ship the new experience with background delivery controls.\\",\\"primaryLabel\\":\\"View changelog\\",\\"secondaryLabel\\":\\"Maybe later\\",\\"dismissLabel\\":\\"Skip\\"}}"
     }
   }
 }
@@ -47,6 +40,8 @@ const String _sampleFcmPayload = '''
 
 class _HomeScreenState extends State<HomeScreen> {
   late example.NotificationService _notificationService;
+  InAppOverlayController? _overlayController;
+  bool _templatesRegistered = false;
 
   @override
   void initState() {
@@ -56,6 +51,16 @@ class _HomeScreenState extends State<HomeScreen> {
       rootNavigatorKey,
     );
     _initializeNotifications();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = InAppOverlayHost.maybeOf(context);
+    if (controller != null && controller != _overlayController) {
+      _overlayController = controller;
+      _registerInAppTemplates();
+    }
   }
 
   Future<void> _initializeNotifications() async {
@@ -81,6 +86,24 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     }
+  }
+
+  void _registerInAppTemplates() {
+    if (_templatesRegistered || _overlayController == null) {
+      return;
+    }
+
+    FirebaseMessagingHandler.instance.registerInAppNotificationTemplates({
+      'builtin_version_prompt': BuiltInInAppTemplates.versionPrompt(
+        controller: _overlayController!,
+        onAction: (actionId, data) {
+          Provider.of<NotificationProvider>(context, listen: false)
+              .addActivity('Version prompt action: $actionId');
+        },
+      ),
+    });
+
+    _templatesRegistered = true;
   }
 
   @override
@@ -265,6 +288,20 @@ class _HomeScreenState extends State<HomeScreen> {
                             'Displays informational content, tips, and helpful guidance for users.',
                       ),
                     ),
+                    FeatureCard(
+                      title: 'Version Prompt',
+                      description:
+                          'Built-in dialog template for app update prompts.',
+                      icon: Icons.system_update,
+                      color: Colors.indigo,
+                      onTap: _triggerVersionPrompt,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Version Prompt Template',
+                        body:
+                            'Built-in template for encouraging users to update the app. Shows a full-screen dialog with customizable content.',
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 32),
@@ -285,6 +322,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         body:
                             'Invokes setIOSBadgeCount and setAndroidBadgeCount through the handler and mirrors the '
                             'state in the provider so you can observe how parity is achieved.',
+                      ),
+                    ),
+                    FeatureCard(
+                      title: 'Version Prompt (In-App)',
+                      description:
+                          'Triggers the built-in version dialog powered by the in-app template kit.',
+                      icon: Icons.system_update,
+                      color: Colors.indigo,
+                      onTap: _notificationService.triggerVersionPromptDemo,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'In-App Templates',
+                        body:
+                            'Demonstrates the bundled version prompt template rendered through the overlay controller. '
+                            'You can drive this via a silent FCM payload using templateId=builtin_version_prompt.',
                       ),
                     ),
                     FeatureCard(
@@ -384,7 +436,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             Text(
               'This example showcases every optional feature in the Firebase Messaging Handler. '
-              'Follow the three-step loop below and watch analytics, badges, and navigation respond in real time.',
+              'Follow the three-step loop below and watch analytics, badges, navigation, and in-app templates respond in real time.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -681,7 +733,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ...provider.notifications.take(10).map(
                 (notification) => NotificationCard(
                   notification: notification,
-                  onTap: () => _openTimelineDetails(context, notification),
+                  onTap: () => _openTimelineDetails(notification),
                 ),
               ),
         if (provider.initialNotification != null) ...[
@@ -694,8 +746,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NotificationCard(
             notification: provider.initialNotification!,
             isInitial: true,
-            onTap: () =>
-                _openTimelineDetails(context, provider.initialNotification!),
+            onTap: () => _openTimelineDetails(provider.initialNotification!),
           ),
         ],
       ],
@@ -794,6 +845,51 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _clearTimeline(BuildContext context, NotificationProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Timeline'),
+        content: const Text(
+          'This will remove stored notifications and activity entries from the local timeline.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await provider.clearTimelineCache();
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Timeline cleared'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openTimelineDetails(NotificationData data) {
+    _notificationService.openScenarioFromTimeline(data);
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final local = timestamp.toLocal();
+    final date =
+        '${local.year.toString().padLeft(4, '0')}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+    final time =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return '$date · $time';
+  }
+
   void _openFirebaseConsole() {
     launchUrl(
       Uri.parse(_firebaseConsoleUrl),
@@ -868,54 +964,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openTimelineDetails(BuildContext context, NotificationData data) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TimelineDetailsScreen(notification: data),
-      ),
-    );
-  }
-
-  Future<void> _clearTimeline(
-    BuildContext context,
-    NotificationProvider provider,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear Timeline'),
-        content: const Text(
-          'This will permanently clear all notification timeline events and activity logs. '
-          'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear All'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      await provider.clearTimelineCache();
-      if (mounted) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Timeline cleared successfully'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    }
-  }
-
   void _showAnalyticsDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -940,33 +988,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _formatTimestamp(DateTime timestamp) {
-    final localTime = timestamp.toLocal();
+  void _triggerVersionPrompt() {
+    if (_overlayController == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('InAppOverlayHost not available'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
 
-    // Always show HH:mm:ss format
-    final timeString = '${localTime.hour.toString().padLeft(2, '0')}:'
-        '${localTime.minute.toString().padLeft(2, '0')}:'
-        '${localTime.second.toString().padLeft(2, '0')}';
+    // Trigger the version prompt template manually
+    FirebaseMessagingHandler.instance
+        .getInAppNotificationStream()
+        .listen((data) {
+      // This would normally be triggered by a silent push
+      // For demo purposes, we'll trigger it manually
+    });
 
-    // Always include date in format: "9, Aug, 2025"
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
+    // For demo, we'll trigger it directly using the InAppMessageManager
+    InAppMessageManager.instance.triggerInAppNotification(
+      InAppNotificationData(
+        id: 'demo_version_prompt_${DateTime.now().millisecondsSinceEpoch}',
+        templateId: 'builtin_version_prompt',
+        triggerType: InAppTriggerTypeEnum.immediate,
+        content: {
+          'title': 'Update Available',
+          'message':
+              'Version 2.0 adds quiet hours and campaign caps. Update now to enjoy the latest features!',
+          'primaryLabel': 'Update Now',
+          'secondaryLabel': 'Remind Me Later',
+          'dismissLabel': 'Maybe Later',
+          'imageUrl':
+              'https://via.placeholder.com/400x225/6366f1/ffffff?text=Version+2.0',
+        },
+        analytics: {'source': 'demo_manual_trigger'},
+        rawPayload: const {},
+        receivedAt: DateTime.now(),
+      ),
+    );
 
-    final dateString =
-        '${localTime.day}, ${months[localTime.month - 1]}, ${localTime.year}';
-    return '$dateString $timeString';
+    Provider.of<NotificationProvider>(context, listen: false)
+        .addActivity('Triggered version prompt template');
   }
 }
 

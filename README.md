@@ -40,6 +40,10 @@ final Stream<NotificationData?>? clickStream = await FirebaseMessagingHandler.in
       name: 'Default Notifications',
       description: 'Default notification channel',
       importance: NotificationImportanceEnum.high,
+      priority: NotificationPriorityEnum.high,
+      playSound: true,
+      enableVibration: true,
+      enableLights: true,
     ),
   ],
   androidNotificationIconPath: '@drawable/ic_notification',
@@ -78,6 +82,10 @@ clickStream?.listen((NotificationData? data) {
 - **🧪 Testing Utilities** - Mock data and streams for comprehensive testing
 - **🪄 In-App Messaging** - Trigger rich in-app templates from silent FCM payloads
 - **🛡️ Foreground Controls** - Fully customize fallback foreground notifications
+- **🎭 In-App Templates** - Welcome, promotion, alert, success, and info templates
+- **📋 Activity Timeline** - Persistent notification history with detailed timestamps
+- **🔄 Smart Retry Logic** - Intelligent Firebase setup retry based on error type
+- **🛠️ Professional Setup** - Guided Firebase configuration with package name guidance
 
 ## 🧰 **What You Get**
 
@@ -88,6 +96,7 @@ Your app starts simple and scales only when you opt in. Every capability ships w
 - **Zero extra deps**: the plugin bundles `firebase_messaging` for you—add one dependency and you are ready for push, scheduling, analytics, and in-app flows.
 - **Progressive adoption**: wire up the click stream today, add interactive actions or in-app templates later without touching existing code.
 - **Configuration-at-callsite**: all advanced APIs expose per-call parameters so you can tailor a single notification without changing global settings.
+- **Navigation flexibility**: Showcase example routes via a root `Navigator` key, demonstrating payload-driven navigation without relying on a BuildContext.
 
 ### **🏗️ Architecture Benefits**
 - **🔧 Modular Design** - Clean separation of concerns
@@ -752,9 +761,75 @@ Supported triggers:
 
 Use `clearPendingInAppNotifications()` to drop queued payloads (optionally targeting a specific `id`).
 
+### **Built-in Templates & Overlay Host**
+
+Wrap your app with `InAppOverlayHost` to let the handler show rich templates:
+
+```dart
+return InAppOverlayHost(
+  child: MaterialApp(
+    navigatorKey: rootNavigatorKey,
+    home: const ShowcaseHome(),
+  ),
+);
+```
+
+Register a built-in template (e.g. version prompt dialog) and track actions:
+
+```dart
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  final overlay = InAppOverlayHost.maybeOf(context);
+  if (overlay != null && !_templatesRegistered) {
+    FirebaseMessagingHandler.instance.registerInAppNotificationTemplates({
+      'builtin_version_prompt': BuiltInInAppTemplates.versionPrompt(
+        controller: overlay,
+        onAction: (actionId, data) {
+          debugPrint('Version prompt action: $actionId');
+        },
+      ),
+    });
+    _templatesRegistered = true;
+  }
+}
+```
+
+Trigger the dialog manually or via a silent payload:
+
+```dart
+InAppMessageManager.instance.triggerInAppNotification(
+  InAppNotificationData(
+    id: 'demo_${DateTime.now().millisecondsSinceEpoch}',
+    templateId: 'builtin_version_prompt',
+    triggerType: InAppTriggerTypeEnum.immediate,
+    content: {
+      'title': 'Update available',
+      'message': 'Version 2.0 adds quiet hours and campaign caps.',
+      'primaryLabel': 'View changelog',
+      'secondaryLabel': 'Remind me later',
+    },
+    analytics: {'source': 'docs_demo'},
+    rawPayload: const {},
+    receivedAt: DateTime.now(),
+  ),
+);
+```
+
 ## 🛡️ **Foreground Notification Customization**
 
-Own the fallback notification UI that appears while your app is active.
+Own the fallback notification UI that appears while your app is active. The plugin includes smart fallback logic to ensure notifications always display, even when no channel ID is provided.
+
+### **Smart Channel Fallback**
+
+The plugin automatically handles Android notification channels with intelligent fallback:
+
+- **Channel Specified**: If a notification includes a channel ID, that specific channel is used
+- **Channel Not Found**: If the specified channel doesn't exist, falls back to the first available channel
+- **No Channel Provided**: If no channel ID is specified, uses the first available channel
+- **No Channels Available**: Logs an error and skips the notification (prevents crashes)
+
+This ensures your Android foreground notifications always display, regardless of Firebase Console configuration.
 
 ### **Override Once, Anywhere**
 

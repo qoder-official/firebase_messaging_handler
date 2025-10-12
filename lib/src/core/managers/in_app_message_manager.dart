@@ -129,6 +129,16 @@ class InAppMessageManager {
     _hasHydratedStorage = false;
   }
 
+  Future<void> triggerInAppNotification(InAppNotificationData data) async {
+    _processedMessageIds.add(data.id);
+    _analyticsService.trackEvent('in_app_triggered', {
+      'template_id': data.templateId,
+      'trigger_type': data.triggerType.name,
+      'manual': true,
+    });
+    _dispatch(data);
+  }
+
   Future<void> _enqueuePending(InAppNotificationData data) async {
     _pendingMemoryQueue.add(data);
     await _storageService.savePendingInAppMessage(data.toMap());

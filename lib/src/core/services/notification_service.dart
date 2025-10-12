@@ -160,7 +160,7 @@ class NotificationService implements NotificationServiceInterface {
                     ))
                 .toList(),
           ),
-          iOS: DarwinNotificationDetails(
+          iOS: const DarwinNotificationDetails(
             categoryIdentifier: 'actionCategory',
             presentAlert: true,
             presentSound: true,

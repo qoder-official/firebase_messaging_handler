@@ -165,7 +165,7 @@ class FCMService implements FCMServiceInterface {
       FirebaseMessaging.onMessageOpenedApp;
 
   @override
-  Stream<RemoteMessage> get onBackgroundMessage => Stream.empty();
+  Stream<RemoteMessage> get onBackgroundMessage => const Stream.empty();
 
   @override
   Future<void> setForegroundNotificationPresentationOptions({

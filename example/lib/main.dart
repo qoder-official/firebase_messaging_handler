@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
+
 import 'screens/home_screen.dart';
 import 'screens/firebase_setup_screen.dart';
 import 'screens/ios_apns_setup_screen.dart';
@@ -26,7 +28,9 @@ class MyApp extends StatelessWidget {
         title: 'Firebase Messaging Handler Showcase',
         theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
         navigatorKey: rootNavigatorKey,
-        home: const FirebaseInitializationWrapper(),
+        home: InAppOverlayHost(
+          child: const FirebaseInitializationWrapper(),
+        ),
         debugShowCheckedModeBanner: false,
       ),
     );
