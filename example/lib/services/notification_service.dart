@@ -1,7 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/material.dart';
 import '../providers/notification_provider.dart';
+import '../screens/scenario_screen.dart';
 
 /// Example service demonstrating the new Firebase Messaging Handler architecture
 ///
@@ -15,8 +16,9 @@ class NotificationService {
   final FirebaseMessagingHandler _messagingHandler =
       FirebaseMessagingHandler.instance;
   final NotificationProvider _notificationProvider;
+  final GlobalKey<NavigatorState> _navigatorKey;
 
-  NotificationService(this._notificationProvider);
+  NotificationService(this._notificationProvider, this._navigatorKey);
 
   Future<void> initialize() async {
     try {
@@ -90,9 +92,11 @@ class NotificationService {
 
       _notificationProvider.setInitialized(true);
       debugPrint('Firebase Messaging Handler initialized successfully');
+      _notificationProvider.addActivity('Handler initialized');
     } catch (e) {
       debugPrint('Error initializing Firebase Messaging Handler: $e');
       _notificationProvider.setInitialized(false);
+      _notificationProvider.addActivity('Initialization error: $e');
     }
   }
 
@@ -102,6 +106,7 @@ class NotificationService {
   }) {
     // Add to notifications list
     _notificationProvider.addNotification(data);
+    _notificationProvider.setActiveNotification(data);
 
     // Handle notification actions
     if (data.payload['is_action'] == true) {
@@ -111,15 +116,19 @@ class NotificationService {
       switch (actionId) {
         case 'reply':
           _showReplyDialog(actionPayload);
+          _notificationProvider.addActivity('Reply action tapped');
           break;
         case 'view':
           _navigateToProfile(actionPayload);
+          _notificationProvider.addActivity('View details action tapped');
           break;
         case 'call':
           _makePhoneCall(actionPayload);
+          _notificationProvider.addActivity('Call action tapped');
           break;
         case 'dismiss':
           // Just dismiss, no action needed
+          _notificationProvider.addActivity('Dismiss action tapped');
           break;
       }
       return;
@@ -153,7 +162,9 @@ class NotificationService {
 
   void _navigateToScreen(NotificationData data) {
     debugPrint('Navigating to screen for notification: ${data.title}');
-    // In a real app, you would navigate to the appropriate screen
+    _navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => ScenarioScreen(notification: data)),
+    );
   }
 
   void _showReplyDialog(Map<String, dynamic>? payload) {
@@ -207,6 +218,7 @@ class NotificationService {
       payload: {'test': true, 'timestamp': DateTime.now().toIso8601String()},
       channelId: 'actions_channel',
     );
+    _notificationProvider.addActivity('Sent interactive notification');
   }
 
   Future<void> scheduleTestNotification() async {
@@ -222,6 +234,7 @@ class NotificationService {
         'scheduled_time': scheduledTime.toIso8601String(),
       },
     );
+    _notificationProvider.addActivity('Scheduled one-time notification');
   }
 
   Future<void> scheduleRecurringNotification() async {
@@ -235,6 +248,7 @@ class NotificationService {
       channelId: 'scheduled_channel',
       payload: {'recurring': true, 'type': 'daily_reminder'},
     );
+    _notificationProvider.addActivity('Scheduled recurring notification');
   }
 
   Future<void> createNotificationGroup() async {
@@ -262,6 +276,7 @@ class NotificationService {
       notifications: notifications,
       channelId: 'default_channel',
     );
+    _notificationProvider.addActivity('Created notification group demo');
   }
 
   Future<void> updateBadges() async {
@@ -269,13 +284,14 @@ class NotificationService {
     await _messagingHandler.setAndroidBadgeCount(3);
     _notificationProvider.setIOSBadgeCount(5);
     _notificationProvider.setAndroidBadgeCount(3);
+    _notificationProvider.addActivity('Updated badge counts');
   }
 
   Future<void> clearAllNotifications() async {
     await _messagingHandler.cancelAllScheduledNotifications();
-    _notificationProvider.clearNotifications();
+    _notificationProvider.clearAll();
     await _messagingHandler.clearBadgeCount();
-    _notificationProvider.clearBadges();
+    _notificationProvider.addActivity('Cleared scheduled notifications');
   }
 
   Future<String?> getCurrentFcmToken() async {

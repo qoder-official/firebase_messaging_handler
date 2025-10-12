@@ -238,6 +238,8 @@ class NotificationService implements NotificationServiceInterface {
         tz.TZDateTime.from(scheduledDate, tz.local),
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: jsonEncode(payload ?? {}),
       );
 

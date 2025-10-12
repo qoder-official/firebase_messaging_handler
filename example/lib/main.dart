@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/firebase_setup_screen.dart';
+import 'screens/ios_apns_setup_screen.dart';
 import 'providers/notification_provider.dart';
+import 'router/app_router.dart';
+import 'services/firebase_setup_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase (required)
-  await Firebase.initializeApp();
 
   runApp(const MyApp());
 }
@@ -25,9 +25,97 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Firebase Messaging Handler Showcase',
         theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-        home: const HomeScreen(),
+        navigatorKey: rootNavigatorKey,
+        home: const FirebaseInitializationWrapper(),
         debugShowCheckedModeBanner: false,
       ),
     );
+  }
+}
+
+class FirebaseInitializationWrapper extends StatefulWidget {
+  const FirebaseInitializationWrapper({super.key});
+
+  @override
+  State<FirebaseInitializationWrapper> createState() =>
+      _FirebaseInitializationWrapperState();
+}
+
+class _FirebaseInitializationWrapperState
+    extends State<FirebaseInitializationWrapper> {
+  bool _isLoading = true;
+  bool _firebaseConfigured = false;
+  bool _continueWithoutApns = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFirebase();
+  }
+
+  Future<void> _initializeFirebase() async {
+    try {
+      final isConfigured = await FirebaseSetupService.initializeAndCheck();
+
+      if (mounted) {
+        setState(() {
+          _firebaseConfigured = isConfigured;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _firebaseConfigured = false;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _retryInitialization() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    FirebaseSetupService.reset();
+    await _initializeFirebase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Initializing Firebase...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_firebaseConfigured && !_continueWithoutApns) {
+      // Show iOS-specific setup if APNs error detected
+      if (FirebaseSetupService.isIOSApnsError) {
+        return IOSApnsSetupScreen(
+          onRetry: _retryInitialization,
+          onContinueWithoutApns: () {
+            setState(() {
+              _continueWithoutApns = true;
+            });
+          },
+        );
+      }
+
+      // Show general Firebase setup for other errors
+      return FirebaseSetupScreen(onRetry: _retryInitialization);
+    }
+
+    return const HomeScreen();
   }
 }

@@ -2,6 +2,58 @@
 
 A comprehensive showcase application demonstrating all the features of the **Firebase Messaging Handler** plugin with the **new modular architecture**.
 
+## 🚨 **First Time Setup**
+
+**This example app requires Firebase to be properly configured before it can run.**
+
+When you first run the app, you'll see a **Firebase Setup Screen** with step-by-step instructions. This prevents crashes and guides you through the complete setup process.
+
+### **Quick Start (5 minutes)**
+
+1. **Run the app** - You'll see the Firebase setup screen
+2. **Follow the on-screen instructions** - Complete setup in the app
+3. **Test notifications** - Use the built-in test features
+
+### **What You'll Need**
+
+- Firebase project (create at [Firebase Console](https://console.firebase.google.com/))
+- Android: `google-services.json` file
+- iOS: `GoogleService-Info.plist` file + APNs key
+- 5 minutes of setup time
+
+### **🔧 Important: Configure Your Own App**
+
+**Before testing, you should configure this example with your own Firebase project:**
+
+1. **Change Package Name** (recommended):
+   ```bash
+   # Update package name in pubspec.yaml
+   name: your_app_name_example
+   
+   # Update Android package name
+   # android/app/build.gradle
+   applicationId "com.yourcompany.yourapp"
+   
+   # Update iOS bundle identifier
+   # ios/Runner/Info.plist
+   CFBundleIdentifier: com.yourcompany.yourapp
+   ```
+
+2. **Set Up Your Firebase Project**:
+   - Create project at [Firebase Console](https://console.firebase.google.com/)
+   - Add Android app with your package name
+   - Add iOS app with your bundle ID
+   - Download configuration files
+
+3. **Replace Configuration Files**:
+   - Place `google-services.json` in `android/app/`
+   - Place `GoogleService-Info.plist` in `ios/Runner/`
+
+4. **Update Firebase Options**:
+   - Run `flutterfire configure` or manually update `lib/firebase_options.dart`
+
+**The app will guide you through everything step-by-step!** 🎯
+
 ## 🏗️ **New Architecture Features**
 
 This example now showcases the **refactored plugin architecture** with:

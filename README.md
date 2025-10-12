@@ -360,6 +360,18 @@ class MyApp extends StatelessWidget {
   }
 }
 
+### **🎓 Showcase Example App**
+
+The `example/` directory doubles as an FCM showcase powered entirely by this plugin:
+
+- **Guided onboarding banner** – copy your FCM token, open the Firebase console, and follow the three-step testing loop.
+- **Quick start scenarios** – fire interactive pushes, schedule one-time or recurring notifications, and generate Android groups with a tap.
+- **Power utilities** – update badges, register custom sound channels, and clear demo data while analytics events stream in.
+- **Scenario detail screen** – every notification routes to a dedicated inspector showing payloads, actions, badges, and metadata.
+- **Activity timeline** – watch a running log of everything the handler does (initialization, scheduling, clears, custom actions).
+
+Run `flutter run` inside `example/` to explore the full experience.
+
 class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -1213,12 +1225,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 **Support**
 
 - **Documentation:** [Complete API Reference](https://pub.dev/documentation/firebase_messaging_handler/latest/)
-- **Examples:** [Example App](example/)
+- **Examples:** [Example App](example/) – guided FCM showcase experience
 - **Issues:** [GitHub Issues](https://github.com/your-repo/firebase_messaging_handler/issues)
 
 ## 🎉 **What's Next?**
 
-- **📱 Example App** - See the plugin in action
+- **📱 Example App** - Launch the FCM showcase demo
 - **📚 API Reference** - Complete method documentation
 - **🧪 Testing** - Try the testing utilities
 - **🚀 Production** - Deploy with confidence

@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:qoder_flutter_fmhexample/main.dart';
+import 'package:firebase_messaging_handler_example/main.dart';
 
 void main() {
   testWidgets('Firebase Messaging Handler example app loads', (
@@ -16,13 +16,8 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
-    // Verify that the app loads and shows the main screen
-    expect(find.text('Firebase Messaging Handler Showcase'), findsOneWidget);
-
-    // Verify that the status card is present
-    expect(find.text('Firebase Messaging Handler Active'), findsOneWidget);
-
-    // Verify that feature showcase is present
-    expect(find.text('🚀 Feature Showcase'), findsOneWidget);
+    // Verify that the app loads and shows the Firebase setup screen
+    // (since Firebase is not configured in tests)
+    expect(find.text('Firebase Setup Required'), findsOneWidget);
   });
 }
