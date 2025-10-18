@@ -660,7 +660,25 @@ class NotificationManager {
         return builtDetails;
       }
     }
-    return _foregroundOptions.androidDefaults;
+
+    // Apply default sound if configured
+    AndroidNotificationDetails? defaults = _foregroundOptions.androidDefaults;
+    if (_foregroundOptions.androidSoundFileName != null && defaults != null) {
+      return AndroidNotificationDetails(
+        defaults.channelId,
+        defaults.channelName,
+        channelDescription: defaults.channelDescription,
+        importance: defaults.importance,
+        priority: defaults.priority,
+        showWhen: defaults.showWhen,
+        enableVibration: defaults.enableVibration,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound(
+            _foregroundOptions.androidSoundFileName!),
+      );
+    }
+
+    return defaults;
   }
 
   Future<DarwinNotificationDetails?> _resolveIOSForegroundDetails(
@@ -676,7 +694,23 @@ class NotificationManager {
         return builtDetails;
       }
     }
-    return _foregroundOptions.iosDefaults;
+
+    // Apply default sound if configured
+    DarwinNotificationDetails? defaults = _foregroundOptions.iosDefaults;
+    if (_foregroundOptions.iosSoundFileName != null && defaults != null) {
+      return DarwinNotificationDetails(
+        presentAlert: defaults.presentAlert,
+        presentSound: true,
+        presentBadge: defaults.presentBadge,
+        sound: _foregroundOptions.iosSoundFileName!,
+        badgeNumber: defaults.badgeNumber,
+        threadIdentifier: defaults.threadIdentifier,
+        subtitle: defaults.subtitle,
+        attachments: defaults.attachments,
+      );
+    }
+
+    return defaults;
   }
 
   ForegroundNotificationContext _buildForegroundContext(RemoteMessage message) {

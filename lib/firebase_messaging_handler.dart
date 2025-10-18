@@ -143,29 +143,6 @@ class FirebaseMessagingHandler {
     await _notificationManager.clearBadgeCount();
   }
 
-  /// Shows a notification with custom sound.
-  ///
-  /// This method allows you to display a local notification with a custom
-  /// sound file. The sound file should be placed in the appropriate platform
-  /// resources directory.
-  Future<void> showNotificationWithCustomSound({
-    required String title,
-    required String body,
-    required String soundFileName,
-    String? channelId,
-    Map<String, dynamic>? payload,
-    int? notificationId,
-  }) async {
-    await _notificationManager.showNotificationWithActions(
-      title: title,
-      body: body,
-      actions: [],
-      payload: payload,
-      channelId: channelId,
-      notificationId: notificationId,
-    );
-  }
-
   /// Creates a notification channel with custom sound (Android)
   Future<void> createCustomSoundChannel({
     required String channelId,

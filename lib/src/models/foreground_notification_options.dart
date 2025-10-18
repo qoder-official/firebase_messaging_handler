@@ -33,12 +33,20 @@ class ForegroundNotificationOptions {
   final AndroidForegroundNotificationBuilder? androidBuilder;
   final IOSForegroundNotificationBuilder? iosBuilder;
 
+  /// Default sound file name for Android (without extension, placed in res/raw/)
+  final String? androidSoundFileName;
+
+  /// Default sound file name for iOS (placed in project)
+  final String? iosSoundFileName;
+
   const ForegroundNotificationOptions({
     this.enabled = true,
     this.androidDefaults,
     this.iosDefaults,
     this.androidBuilder,
     this.iosBuilder,
+    this.androidSoundFileName,
+    this.iosSoundFileName,
   });
 
   static const ForegroundNotificationOptions defaults =

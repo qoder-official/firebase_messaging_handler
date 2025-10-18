@@ -980,6 +980,129 @@ The builders receive the real `RemoteMessage`, so you can map any data payload t
 
 Prefer static overrides? Use `androidDefaults` / `iosDefaults` to plug in prebuilt `AndroidNotificationDetails` or `DarwinNotificationDetails` instances without writing builders.
 
+### **🔊 Configure Default Custom Sounds**
+
+Set custom sounds once—they'll apply to all foreground notifications automatically:
+
+```dart
+// Step 1: Configure default sounds for foreground notifications
+FirebaseMessagingHandler.instance.setForegroundNotificationOptions(
+  ForegroundNotificationOptions(
+    // Android: Place sound file in android/app/src/main/res/raw/custom_sound.mp3
+    androidSoundFileName: 'custom_sound', // Without extension
+    
+    // iOS: Place sound file in project (Runner/Sounds/custom_sound.aiff)
+    iosSoundFileName: 'custom_sound.aiff', // With extension
+    
+    androidDefaults: const AndroidNotificationDetails(
+      'default_channel',
+      'Default Notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+    ),
+    iosDefaults: const DarwinNotificationDetails(
+      presentAlert: true,
+      presentSound: true,
+      presentBadge: true,
+    ),
+  ),
+);
+```
+
+**Platform-Specific Sound Configuration:**
+
+**Android (Two Options):**
+
+**Option 1:** Default sound for all foreground notifications (shown above)
+```dart
+ForegroundNotificationOptions(
+  androidSoundFileName: 'custom_sound', // Applied to all foreground notifications
+)
+```
+
+**Option 2:** Per-channel sounds (configured during init)
+```dart
+await FirebaseMessagingHandler.instance.init(
+  senderId: 'your_sender_id',
+  androidChannelList: [
+    NotificationChannelData(
+      id: 'default_channel',
+      name: 'Default Notifications',
+      soundFileName: 'default_sound', // Sound for this channel only
+    ),
+    NotificationChannelData(
+      id: 'urgent_channel',
+      name: 'Urgent Alerts',
+      soundFileName: 'urgent_sound', // Different sound for urgent channel
+    ),
+  ],
+  androidNotificationIconPath: '@drawable/ic_notification',
+);
+```
+
+**iOS:**
+
+iOS doesn't have channels, so configure the default sound through `ForegroundNotificationOptions`:
+```dart
+ForegroundNotificationOptions(
+  iosSoundFileName: 'custom_sound.aiff', // Applied to ALL iOS notifications
+)
+```
+
+**⚠️ Important iOS Limitation:**
+
+**Foreground Notifications (App Active):**
+- ✅ **Custom sounds work** - Via `ForegroundNotificationOptions.iosSoundFileName`
+- ✅ **Full control** - Our plugin handles these notifications
+
+**Background Notifications (App Killed/Backgrounded):**
+- ❌ **Custom sounds DON'T work** - iOS system handles these directly
+- ❌ **No control** - System uses default notification sound
+
+**💡 Workaround for Background Sounds:**
+
+For background notifications, configure the sound in your **Firebase Console payload**:
+
+```json
+{
+  "notification": {
+    "title": "Background Notification",
+    "body": "This will use system default sound",
+    "sound": "custom_sound.aiff"  // iOS will use this if file exists in app bundle
+  },
+  "apns": {
+    "payload": {
+      "aps": {
+        "sound": "custom_sound.aiff"  // Alternative APNs-specific sound
+      }
+    }
+  }
+}
+```
+
+**Requirements for Background Sounds:**
+1. Sound file must be in your iOS app bundle (added via Xcode)
+2. Sound file must be ≤ 30 seconds
+3. Supported formats: AIFF, CAF, WAV
+4. If file doesn't exist, iOS falls back to default sound
+
+**Sound File Setup:**
+
+**Android:**
+1. Place sound file in `android/app/src/main/res/raw/`
+2. Use filename **without** extension (e.g., `custom_sound` for `custom_sound.mp3`)
+3. Supported formats: MP3, OGG
+
+**iOS:**
+1. Add sound file to Xcode project (via Xcode > Add Files)
+2. Ensure it's added to the target (check "Copy items if needed")
+3. Use filename **with** extension (e.g., `custom_sound.aiff`)
+4. Supported formats: AIFF, CAF, WAV (up to 30 seconds)
+
+> 💡 **Pro Tip:** 
+> - **Android**: Use `NotificationChannelData.soundFileName` for per-channel sounds, or `ForegroundNotificationOptions.androidSoundFileName` for all foreground notifications
+> - **iOS**: Use `ForegroundNotificationOptions.iosSoundFileName` - this is the ONLY way to set default sounds on iOS since iOS doesn't have channels
+
 > ℹ️ Use `DrawableResourceAndroidBitmap`, `ByteArrayAndroidBitmap`, or `FilePathAndroidBitmap` depending on where your assets live. For iOS, `DarwinNotificationAttachment` expects a local resource URI—download remote media before attaching it.
 
 ## 📊 **Analytics Integration**
