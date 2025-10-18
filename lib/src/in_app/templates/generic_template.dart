@@ -325,15 +325,22 @@ class BuiltInInAppTemplates {
             ),
           );
           break;
-        case 'tooltip':
-          await presenter.showOverlayEntry(
-            (context, dismiss) => _TooltipTemplate(
-              config: config,
-              data: data,
-              onAction: onAction,
-              onDismiss: dismiss,
+        case 'snackbar':
+          await presenter.showSnackBar(
+            SnackBar(
+              content: Text(config.body ?? config.title ?? ''),
+              behavior: SnackBarBehavior.floating,
+              duration: config.autoDismiss ?? const Duration(seconds: 4),
+              backgroundColor: config.backgroundColor,
+              action: config.buttons.isEmpty
+                  ? null
+                  : SnackBarAction(
+                      label: config.buttons.first.label,
+                      textColor: config.textColor,
+                      onPressed: () =>
+                          onAction?.call(config.buttons.first.id, data),
+                    ),
             ),
-            displayDuration: config.autoDismiss ?? const Duration(seconds: 4),
           );
           break;
         case 'carousel':
@@ -344,22 +351,6 @@ class BuiltInInAppTemplates {
               config: config,
               data: data,
               onAction: onAction,
-            ),
-          );
-          break;
-        case 'snackbar':
-          await presenter.showSnackBar(
-            SnackBar(
-              content: Text(config.body ?? config.title ?? ''),
-              behavior: SnackBarBehavior.floating,
-              duration: config.autoDismiss ?? const Duration(seconds: 4),
-              action: config.buttons.isEmpty
-                  ? null
-                  : SnackBarAction(
-                      label: config.buttons.first.label,
-                      onPressed: () =>
-                          onAction?.call(config.buttons.first.id, data),
-                    ),
             ),
           );
           break;
@@ -461,7 +452,7 @@ class _BottomSheetTemplate extends StatelessWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewPadding.bottom + 24,
+          bottom: MediaQuery.of(context).viewPadding.bottom + 8,
           left: 24,
           right: 24,
           top: 24,
@@ -477,6 +468,8 @@ class _BottomSheetTemplate extends StatelessWidget {
   }
 }
 
+// Removed tooltip template functionality as requested
+/*
 class _TooltipTemplate extends StatelessWidget {
   const _TooltipTemplate({
     required this.config,
@@ -595,6 +588,8 @@ class _TooltipTemplate extends StatelessWidget {
     );
   }
 }
+
+*/
 
 class _CarouselTemplate extends StatefulWidget {
   const _CarouselTemplate({
@@ -715,51 +710,6 @@ class _CarouselTemplateState extends State<_CarouselTemplate> {
   }
 }
 
-class _TrianglePainter extends CustomPainter {
-  _TrianglePainter({required this.color, required this.direction});
-
-  final Color color;
-  final String direction;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path();
-
-    switch (direction) {
-      case 'bottom':
-        path.moveTo(0, 0);
-        path.lineTo(size.width / 2, size.height);
-        path.lineTo(size.width, 0);
-        break;
-      case 'left':
-        path.moveTo(size.width, 0);
-        path.lineTo(0, size.height / 2);
-        path.lineTo(size.width, size.height);
-        break;
-      case 'right':
-        path.moveTo(0, 0);
-        path.lineTo(size.width, size.height / 2);
-        path.lineTo(0, size.height);
-        break;
-      case 'top':
-      default:
-        path.moveTo(0, size.height);
-        path.lineTo(size.width / 2, 0);
-        path.lineTo(size.width, size.height);
-        break;
-    }
-
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_TrianglePainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.direction != direction;
-  }
-}
-
 class _BannerTemplate extends StatelessWidget {
   const _BannerTemplate({
     required this.config,
@@ -789,11 +739,10 @@ class _BannerTemplate extends StatelessWidget {
           child: Container(
             width: media.width * 0.94,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: _TemplateContent(
+            child: _BannerContent(
               config: config,
               data: data,
               onAction: onAction,
-              isCompact: true,
               onDismiss: onDismiss,
             ),
           ),
@@ -805,6 +754,137 @@ class _BannerTemplate extends StatelessWidget {
       ignoring: false,
       child: banner,
     );
+  }
+}
+
+class _BannerContent extends StatelessWidget {
+  const _BannerContent({
+    required this.config,
+    required this.data,
+    this.onAction,
+    required this.onDismiss,
+  });
+
+  final GenericTemplateConfig config;
+  final InAppNotificationData data;
+  final InAppTemplateActionCallback? onAction;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final children = <Widget>[];
+    final textColor = config.textColor ?? Colors.white;
+    final title = config.title;
+    final body = config.body;
+    final buttons = config.buttons;
+
+    // Title
+    if (title != null) {
+      children.add(
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+        ),
+      );
+      children.add(const SizedBox(height: 8));
+    }
+
+    // Body
+    if (body != null) {
+      children.add(
+        Text(
+          body,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: textColor.withValues(alpha: 0.9),
+                fontSize: 14,
+              ),
+        ),
+      );
+      children.add(const SizedBox(height: 16));
+    }
+
+    // Buttons
+    if (buttons.isNotEmpty) {
+      children.add(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: buttons
+              .map((button) => _buildBannerButton(context, button))
+              .toList(),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: children,
+    );
+  }
+
+  Widget _buildBannerButton(
+      BuildContext context, GenericTemplateButton button) {
+    void handlePressed() {
+      onDismiss();
+      if (!button.dismissOnly) {
+        onAction?.call(button.id, data);
+      }
+    }
+
+    final textColor = config.textColor ?? Colors.white;
+
+    switch (button.style) {
+      case GenericButtonStyle.outlined:
+        return OutlinedButton(
+          onPressed: handlePressed,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            side: BorderSide(color: textColor.withValues(alpha: 0.3)),
+            foregroundColor: textColor,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text(button.label),
+        );
+      case GenericButtonStyle.text:
+        return TextButton(
+          onPressed: handlePressed,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            foregroundColor: textColor.withValues(alpha: 0.8),
+          ),
+          child: Text(button.label),
+        );
+      case GenericButtonStyle.link:
+        return TextButton(
+          onPressed: handlePressed,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            foregroundColor: textColor.withValues(alpha: 0.8),
+          ),
+          child: Text(
+            button.label,
+            style: const TextStyle(decoration: TextDecoration.underline),
+          ),
+        );
+      case GenericButtonStyle.filled:
+        return FilledButton(
+          onPressed: handlePressed,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            backgroundColor: textColor,
+            foregroundColor: config.backgroundColor,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text(button.label),
+        );
+    }
   }
 }
 
@@ -862,24 +942,26 @@ class _TemplateContent extends StatelessWidget {
       children.add(
         Text(
           title,
+          textAlign: TextAlign.center,
           style: Theme.of(context)
               .textTheme
               .titleLarge
               ?.copyWith(color: textColor, fontWeight: FontWeight.bold),
         ),
       );
-      children.add(const SizedBox(height: 8));
+      children.add(const SizedBox(height: 12));
     }
 
     if (subtitle != null) {
       children.add(Text(
         subtitle,
+        textAlign: TextAlign.center,
         style: Theme.of(context)
             .textTheme
             .titleMedium
             ?.copyWith(color: textColor.withValues(alpha: 0.85)),
       ));
-      children.add(const SizedBox(height: 8));
+      children.add(const SizedBox(height: 12));
     }
 
     if (html != null) {
@@ -892,6 +974,7 @@ class _TemplateContent extends StatelessWidget {
     } else if (body != null) {
       children.add(Text(
         body,
+        textAlign: TextAlign.center,
         style: Theme.of(context)
             .textTheme
             .bodyMedium
@@ -900,7 +983,7 @@ class _TemplateContent extends StatelessWidget {
     }
 
     if (body != null || html != null) {
-      children.add(const SizedBox(height: 16));
+      children.add(const SizedBox(height: 24));
     }
 
     if (buttons.isNotEmpty) {
@@ -917,19 +1000,22 @@ class _TemplateContent extends StatelessWidget {
         children.add(Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final button in buttonWidgets) ...[
-              button,
-              const SizedBox(height: 12),
+            for (int i = 0; i < buttonWidgets.length; i++) ...[
+              buttonWidgets[i],
+              if (i < buttonWidgets.length - 1) const SizedBox(height: 16),
             ],
           ],
         ));
       }
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: children,
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
     );
   }
 
@@ -945,11 +1031,20 @@ class _TemplateContent extends StatelessWidget {
       case GenericButtonStyle.outlined:
         return OutlinedButton(
           onPressed: handlePressed,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+            foregroundColor: Colors.white,
+          ),
           child: Text(button.label),
         );
       case GenericButtonStyle.text:
         return TextButton(
           onPressed: handlePressed,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            foregroundColor: Colors.white.withValues(alpha: 0.8),
+          ),
           child: Text(button.label),
         );
       case GenericButtonStyle.link:
@@ -957,6 +1052,10 @@ class _TemplateContent extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: TextButton(
             onPressed: handlePressed,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              foregroundColor: Colors.white.withValues(alpha: 0.8),
+            ),
             child: Text(
               button.label,
               style: const TextStyle(decoration: TextDecoration.underline),
@@ -966,6 +1065,11 @@ class _TemplateContent extends StatelessWidget {
       case GenericButtonStyle.filled:
         return FilledButton(
           onPressed: handlePressed,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black87,
+          ),
           child: Text(button.label),
         );
     }

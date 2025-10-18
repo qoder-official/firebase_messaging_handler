@@ -764,6 +764,31 @@ Use `clearPendingInAppNotifications()` to drop queued payloads (optionally targe
 
 ### **Built-in Templates & Overlay Support**
 
+**🎯 Perfect Use Cases for In-App Templates:**
+- **Feature announcements** - Introduce new capabilities
+- **User onboarding** - Guide users through app features  
+- **Feedback collection** - Gather user ratings and suggestions
+- **Promotional content** - Showcase offers and campaigns
+- **Educational content** - Tips, tutorials, and help
+- **User engagement** - Surveys, polls, and interactive content
+- **Quick notifications** - Snackbars for non-intrusive messages
+
+**❌ Avoid for Critical Updates:**
+- **App updates** - Use system-level update prompts instead
+- **Security alerts** - Use push notifications for immediate attention
+- **Payment confirmations** - Use dedicated UI flows
+- **Emergency notifications** - Use push notifications for reliability
+
+**🚀 Template Flexibility:**
+These built-in templates are just **examples**! The plugin provides a flexible foundation where you can:
+- **Register custom templates** with your own layouts and animations
+- **Create any UI component** - modals, sheets, cards, overlays, etc.
+- **Define custom interactions** - gestures, animations, transitions
+- **Build brand-specific experiences** - match your app's design system
+- **Implement complex workflows** - multi-step processes, wizards, etc.
+
+The plugin handles the infrastructure (overlay management, navigation, analytics) while you build the experience!
+
 Provide a navigator key so the handler can present rich layouts:
 
 ```dart
@@ -803,15 +828,16 @@ InAppMessageManager.instance.triggerInAppNotification(
     triggerType: InAppTriggerTypeEnum.immediate,
     content: {
       'layout': 'dialog',
-      'title': 'Update available',
-      'message': 'Version 2.0 adds quiet hours and campaign caps.',
-      'primaryLabel': 'View changelog',
-      'secondaryLabel': 'Remind me later',
+      'title': 'New Feature Available',
+      'subtitle': 'Enhanced notification controls',
+      'body': 'We\'ve added smart scheduling and quiet hours. Try them out!',
+      'imageUrl': 'https://via.placeholder.com/600x320/059669/ffffff?text=New+Feature',
       'blurSigma': 16,
       'cornerRadius': 20,
       'buttons': [
-        {'id': 'primary', 'label': 'View changelog', 'style': 'filled'},
-        {'id': 'later', 'label': 'Maybe later', 'style': 'outlined', 'dismissOnly': true}
+        {'id': 'try_now', 'label': 'Try Now', 'style': 'filled'},
+        {'id': 'learn_more', 'label': 'Learn More', 'style': 'outlined'},
+        {'id': 'dismiss', 'label': 'Not now', 'style': 'text', 'dismissOnly': true}
       ],
     },
     analytics: {'source': 'docs_demo'},
@@ -834,6 +860,54 @@ Key payload fields:
 - `autoDismissSeconds`: auto-dismiss duration for banners/snackbars
 - `position`: `top` or `bottom` for banner layout
 - `pages`: list of page maps (carousel) each supporting `title`, `body`, `html`, `imageUrl`, and `buttons`
+
+### **Custom Template Registration**
+
+Create your own templates with complete control over UI and behavior:
+
+```dart
+// Register a custom template
+FirebaseMessagingHandler.instance.registerInAppNotificationTemplates({
+  'my_custom_template': InAppNotificationTemplate(
+    id: 'my_custom_template',
+    description: 'Custom onboarding flow',
+    autoDismissDuration: null, // Manual dismiss
+    onDisplay: (data) {
+      // Your custom UI logic here
+      showDialog(
+        context: context,
+        builder: (context) => MyCustomOnboardingDialog(
+          title: data.content['title'],
+          steps: data.content['steps'],
+          onComplete: () => data.onAction?.call('completed', data),
+        ),
+      );
+    },
+  ),
+  
+  'my_animated_banner': InAppNotificationTemplate(
+    id: 'my_animated_banner',
+    description: 'Animated promotional banner',
+    autoDismissDuration: const Duration(seconds: 5),
+    onDisplay: (data) {
+      // Custom animated banner with your branding
+      showAnimatedBanner(
+        message: data.content['message'],
+        backgroundColor: data.content['color'],
+        animation: SlideAnimation.fromTop(),
+      );
+    },
+  ),
+});
+```
+
+**Custom Template Benefits:**
+- **Complete UI control** - Use any Flutter widget
+- **Brand consistency** - Match your app's design system
+- **Advanced animations** - Custom transitions and effects
+- **Complex interactions** - Multi-step flows, gestures, etc.
+- **Platform-specific behavior** - Different UIs per platform
+- **Integration flexibility** - Connect to your existing components
 
 ## 🛡️ **Foreground Notification Customization**
 

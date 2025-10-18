@@ -32,27 +32,27 @@ const String _sampleFcmPayload = '''
       "campaign": "showcase",
       "step": "console-push",
       "deep_link": "app://notifications/showcase",
-      "fcmh_inapp": "{\\"id\\":\\"version_prompt_demo\\",\\"templateId\\":\\"builtin_version_prompt\\",\\"trigger\\":\\"immediate\\",\\"content\\":{\\"title\\":\\"Update ready\\",\\"message\\":\\"Ship the new experience with background delivery controls.\\",\\"primaryLabel\\":\\"View changelog\\",\\"secondaryLabel\\":\\"Maybe later\\",\\"dismissLabel\\":\\"Skip\\"}}"
+      "fcmh_inapp": "{\\"id\\":\\"welcome_demo\\",\\"templateId\\":\\"builtin_generic\\",\\"trigger\\":\\"immediate\\",\\"content\\":{\\"layout\\":\\"dialog\\",\\"title\\":\\"Welcome!\\",\\"body\\":\\"Thanks for trying our notification testing app.\\",\\"buttons\\":[{\\"id\\":\\"explore\\",\\"label\\":\\"Explore Features\\",\\"style\\":\\"filled\\"}]}}"
     }
   }
 }
 ''';
 
 const Map<String, String> _templateSamples = {
-  'Version Prompt Dialog': '''
+  'Welcome Dialog': '''
 {
-  "id": "demo-version",
+  "id": "demo-welcome",
   "templateId": "builtin_generic",
   "trigger": "immediate",
   "content": {
     "layout": "dialog",
-    "title": "Update available",
-    "subtitle": "Version 2.0 ships with quiet hours",
-    "body": "Install the latest build to unlock throttling controls and background listeners.",
-    "imageUrl": "https://via.placeholder.com/600x320/111827/ffffff?text=Version+2.0",
+    "title": "Welcome to our app!",
+    "subtitle": "Get started with these features",
+    "body": "Discover powerful notification features and customize your experience.",
+    "imageUrl": "https://via.placeholder.com/600x320/4F46E5/ffffff?text=Welcome",
     "buttons": [
-      {"id": "primary", "label": "View changelog", "style": "filled"},
-      {"id": "secondary", "label": "Remind me later", "style": "outlined", "dismissOnly": true}
+      {"id": "explore", "label": "Explore Features", "style": "filled"},
+      {"id": "later", "label": "Maybe later", "style": "outlined", "dismissOnly": true}
     ],
     "blurSigma": 18,
     "barrierColor": "#33000000"
@@ -94,49 +94,59 @@ const Map<String, String> _templateSamples = {
   }
 }
 ''',
-  'Tooltip Tip': '''
+  'Quick Snackbar': '''
 {
-  "id": "demo-tooltip",
+  "id": "demo-snackbar",
   "templateId": "builtin_generic",
   "trigger": "immediate",
   "content": {
-    "layout": "tooltip",
-    "position": "bottom",
-    "title": "Pro tip",
-    "body": "Long-press a notification in the timeline to jump to the detail inspector.",
+    "layout": "snackbar",
+    "title": "Quick Tip",
+    "body": "Long-press notifications in timeline for details",
     "backgroundColor": "#1E293B",
+    "textColor": "#F9FAFB",
+    "autoDismissSeconds": 3,
     "buttons": [
-      {"id": "dismiss", "label": "Got it", "style": "text", "dismissOnly": true}
-    ],
-    "autoDismissSeconds": 5
+      {"id": "got_it", "label": "Got it", "style": "filled"}
+    ]
   }
 }
 ''',
-  'Carousel Survey': '''
+  'Feature Announcement': '''
 {
-  "id": "demo-carousel",
+  "id": "demo-feature",
   "templateId": "builtin_generic",
   "trigger": "immediate",
   "content": {
-    "layout": "carousel",
-    "pages": [
-      {
-        "title": "Quiet hours",
-        "body": "We are preparing quiet-hour controls. Would you use them?",
-        "imageUrl": "https://via.placeholder.com/600x320/0F172A/ffffff?text=Quiet+Hours",
-        "buttons": [
-          {"id": "yes", "label": "Absolutely", "style": "filled"},
-          {"id": "later", "label": "Tell me later", "style": "outlined", "dismissOnly": true}
-        ]
-      },
-      {
-        "title": "Background actions",
-        "body": "How important is handling notification actions while the app is killed?",
-        "buttons": [
-          {"id": "critical", "label": "Critical", "style": "filled"},
-          {"id": "nice_to_have", "label": "Nice to have", "style": "text"}
-        ]
-      }
+    "layout": "dialog",
+    "title": "New Feature Available",
+    "subtitle": "Enhanced notification controls",
+    "body": "We've added smart scheduling and quiet hours. Try them out!",
+    "imageUrl": "https://via.placeholder.com/600x320/059669/ffffff?text=New+Feature",
+    "buttons": [
+      {"id": "try_now", "label": "Try Now", "style": "filled"},
+      {"id": "learn_more", "label": "Learn More", "style": "outlined"},
+      {"id": "dismiss", "label": "Not now", "style": "text", "dismissOnly": true}
+    ],
+    "blurSigma": 12,
+    "barrierColor": "#22000000"
+  }
+}
+''',
+  'User Feedback Request': '''
+{
+  "id": "demo-feedback",
+  "templateId": "builtin_generic",
+  "trigger": "immediate",
+  "content": {
+    "layout": "bottom_sheet",
+    "title": "How are we doing?",
+    "body": "We'd love to hear your thoughts on our notification features.",
+    "buttons": [
+      {"id": "rate_5", "label": "⭐⭐⭐⭐⭐", "style": "filled"},
+      {"id": "rate_4", "label": "⭐⭐⭐⭐", "style": "outlined"},
+      {"id": "rate_3", "label": "⭐⭐⭐", "style": "outlined"},
+      {"id": "skip", "label": "Skip", "style": "text", "dismissOnly": true}
     ]
   }
 }
@@ -388,17 +398,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     FeatureCard(
-                      title: 'Version Prompt',
+                      title: 'Feature Announcement',
                       description:
-                          'Built-in dialog template for app update prompts.',
-                      icon: Icons.system_update,
-                      color: Colors.indigo,
-                      onTap: _notificationService.triggerVersionPromptDemo,
+                          'Announce new features and capabilities to users.',
+                      icon: Icons.new_releases,
+                      color: Colors.green,
+                      onTap:
+                          _notificationService.triggerFeatureAnnouncementDemo,
                       onInfoTap: () => _showFeatureInfo(
                         context,
-                        title: 'Version Prompt Template',
+                        title: 'Feature Announcement Template',
                         body:
-                            'Built-in template for encouraging users to update the app. Shows a full-screen dialog with customizable content.',
+                            'Perfect for announcing new features, capabilities, or improvements. Uses a dialog layout with customizable content.',
                       ),
                     ),
                   ],
@@ -424,18 +435,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     FeatureCard(
-                      title: 'Version Prompt (In-App)',
+                      title: 'User Feedback',
                       description:
-                          'Triggers the built-in version dialog powered by the in-app template kit.',
-                      icon: Icons.system_update,
-                      color: Colors.indigo,
-                      onTap: _notificationService.triggerVersionPromptDemo,
+                          'Collect user feedback and ratings through interactive templates.',
+                      icon: Icons.feedback,
+                      color: Colors.orange,
+                      onTap: _notificationService.triggerUserFeedbackDemo,
                       onInfoTap: () => _showFeatureInfo(
                         context,
-                        title: 'In-App Templates',
+                        title: 'User Feedback Template',
                         body:
-                            'Demonstrates the bundled version prompt template rendered through the overlay controller. '
-                            'You can drive this via a silent FCM payload using templateId=builtin_version_prompt.',
+                            'Collect user feedback, ratings, and suggestions through interactive bottom sheet templates. '
+                            'Perfect for understanding user satisfaction and gathering insights.',
                       ),
                     ),
                     FeatureCard(
@@ -916,8 +927,34 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Simulate silent FCM payloads and preview dialog, banner, bottom sheet, tooltip, and carousel layouts.',
+              'Simulate silent FCM payloads and preview dialog, banner, bottom sheet, snackbar, and carousel layouts.',
               style: TextStyle(color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'These are just examples! You can create custom templates with any layout, styling, and behavior using our flexible template system.',
+                      style: TextStyle(
+                        color: Colors.blue.shade800,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             Row(
@@ -980,7 +1017,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Tip: these samples map directly to the payload structure described in the README.',
+              '💡 Pro Tip: These are just examples! Register custom templates with your own layouts, animations, and interactions. The plugin provides the infrastructure - you build the experience!',
               style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
             ),
           ],

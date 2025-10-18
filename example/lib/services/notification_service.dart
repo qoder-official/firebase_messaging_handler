@@ -363,28 +363,37 @@ class NotificationService {
     _notificationProvider.addActivity('Cleared scheduled notifications');
   }
 
-  Future<void> triggerVersionPromptDemo() async {
+  Future<void> triggerFeatureAnnouncementDemo() async {
     final now = DateTime.now();
     final content = {
       'layout': 'dialog',
-      'title': 'Update available',
-      'message':
-          'Version 2.0 is live with background delivery controls and new analytics hooks.',
-      'primaryLabel': 'View release notes',
-      'secondaryLabel': 'Remind me later',
-      'dismissLabel': 'Skip this version',
+      'title': 'New Feature Available',
+      'subtitle': 'Enhanced notification controls',
+      'body': 'We\'ve added smart scheduling and quiet hours. Try them out!',
       'imageUrl':
-          'https://via.placeholder.com/600x320/111827/ffffff?text=Version+2.0',
+          'https://via.placeholder.com/600x320/059669/ffffff?text=New+Feature',
+      'buttons': [
+        {'id': 'try_now', 'label': 'Try Now', 'style': 'filled'},
+        {'id': 'learn_more', 'label': 'Learn More', 'style': 'outlined'},
+        {
+          'id': 'dismiss',
+          'label': 'Not now',
+          'style': 'text',
+          'dismissOnly': true
+        }
+      ],
+      'blurSigma': 12,
+      'barrierColor': '#22000000'
     };
 
     final data = InAppNotificationData(
-      id: 'version_prompt_${now.millisecondsSinceEpoch}',
+      id: 'feature_announcement_${now.millisecondsSinceEpoch}',
       templateId: 'builtin_generic',
       triggerType: InAppTriggerTypeEnum.immediate,
       content: content,
       analytics: {
         'source': 'example_demo',
-        'campaign': 'showcase_version_prompt',
+        'campaign': 'showcase_feature_announcement',
       },
       rawPayload: {
         'templateId': 'builtin_generic',
@@ -394,7 +403,42 @@ class NotificationService {
     );
 
     await _inAppMessageManager.triggerInAppNotification(data);
-    _notificationProvider.addActivity('Triggered version prompt template');
+    _notificationProvider
+        .addActivity('Triggered feature announcement template');
+  }
+
+  Future<void> triggerUserFeedbackDemo() async {
+    final now = DateTime.now();
+    final content = {
+      'layout': 'bottom_sheet',
+      'title': 'How are we doing?',
+      'body': 'We\'d love to hear your thoughts on our notification features.',
+      'buttons': [
+        {'id': 'rate_5', 'label': '⭐⭐⭐⭐⭐', 'style': 'filled'},
+        {'id': 'rate_4', 'label': '⭐⭐⭐⭐', 'style': 'outlined'},
+        {'id': 'rate_3', 'label': '⭐⭐⭐', 'style': 'outlined'},
+        {'id': 'skip', 'label': 'Skip', 'style': 'text', 'dismissOnly': true}
+      ]
+    };
+
+    final data = InAppNotificationData(
+      id: 'user_feedback_${now.millisecondsSinceEpoch}',
+      templateId: 'builtin_generic',
+      triggerType: InAppTriggerTypeEnum.immediate,
+      content: content,
+      analytics: {
+        'source': 'example_demo',
+        'campaign': 'showcase_user_feedback',
+      },
+      rawPayload: {
+        'templateId': 'builtin_generic',
+        'content': content,
+      },
+      receivedAt: now,
+    );
+
+    await _inAppMessageManager.triggerInAppNotification(data);
+    _notificationProvider.addActivity('Triggered user feedback template');
   }
 
   void openScenarioFromTimeline(NotificationData data) {
