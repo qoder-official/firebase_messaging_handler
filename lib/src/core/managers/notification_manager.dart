@@ -75,12 +75,12 @@ class NotificationManager {
       }
 
       // Configure iOS foreground notification presentation options
-      // This prevents iOS from automatically showing notifications when app is in foreground
-      // We handle them manually via our custom notification system
+      // Enable automatic notifications for iOS since flutter_local_notifications
+      // doesn't show notifications when app is in foreground on iOS
       await _fcmService.setForegroundNotificationPresentationOptions(
-        alert: false, // Disable automatic alerts
+        alert: true, // Enable automatic alerts (iOS only)
         badge: true, // Keep badge updates
-        sound: false, // Disable automatic sounds (we handle custom sounds)
+        sound: true, // Enable automatic sounds
       );
 
       // Handle FCM token
@@ -881,7 +881,10 @@ class NotificationManager {
           await _showAndroidNotification(
               message, androidChannels, androidNotificationIconPath);
         } else if (isIOS) {
-          await _showIOSNotification(message);
+          // iOS handles foreground notifications automatically via setForegroundNotificationPresentationOptions
+          // No need to manually show notifications to avoid duplicates
+          _logMessage(
+              '[NotificationManager] iOS foreground notification handled by system');
         } else {
           // Web platform
           await _showWebNotification(message);
@@ -950,27 +953,6 @@ class NotificationManager {
     }
   }
 
-  Future<void> _showIOSNotification(RemoteMessage message) async {
-    try {
-      final RemoteNotification? notification = message.notification;
-
-      if (notification != null) {
-        final DarwinNotificationDetails? iosOverride =
-            await _resolveIOSForegroundDetails(message);
-        await _notificationService.showNotification(
-          id: notification.hashCode,
-          title: notification.title ?? '',
-          body: notification.body ?? '',
-          payload: message.data,
-          iosDetailsOverride: iosOverride,
-        );
-      }
-    } catch (error, stack) {
-      _logMessage('[NotificationManager] Show iOS notification error: $error');
-      _logMessage('[NotificationManager] Stack trace: $stack');
-    }
-  }
-
   Future<AndroidNotificationDetails?> _resolveAndroidForegroundDetails(
       RemoteMessage message) async {
     final ForegroundNotificationContext context =
@@ -999,38 +981,6 @@ class NotificationManager {
         playSound: true,
         sound: RawResourceAndroidNotificationSound(
             _foregroundOptions.androidSoundFileName!),
-      );
-    }
-
-    return defaults;
-  }
-
-  Future<DarwinNotificationDetails?> _resolveIOSForegroundDetails(
-      RemoteMessage message) async {
-    final ForegroundNotificationContext context =
-        _buildForegroundContext(message);
-    if (_foregroundOptions.iosBuilder != null) {
-      final DarwinNotificationDetails? builtDetails =
-          await Future<DarwinNotificationDetails?>.value(
-        _foregroundOptions.iosBuilder!(context),
-      );
-      if (builtDetails != null) {
-        return builtDetails;
-      }
-    }
-
-    // Apply default sound if configured
-    DarwinNotificationDetails? defaults = _foregroundOptions.iosDefaults;
-    if (_foregroundOptions.iosSoundFileName != null && defaults != null) {
-      return DarwinNotificationDetails(
-        presentAlert: defaults.presentAlert,
-        presentSound: true,
-        presentBadge: defaults.presentBadge,
-        sound: _foregroundOptions.iosSoundFileName!,
-        badgeNumber: defaults.badgeNumber,
-        threadIdentifier: defaults.threadIdentifier,
-        subtitle: defaults.subtitle,
-        attachments: defaults.attachments,
       );
     }
 
