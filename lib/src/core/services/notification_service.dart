@@ -1,19 +1,25 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:universal_html/js.dart' as js;
 import '../interfaces/notification_service_interface.dart';
+import '../../constants/firebase_messaging_handler_constants.dart';
+import '../../enums/repeat_interval_enum.dart';
 import '../../models/export.dart';
+import '../utils/platform_utils.dart';
+import 'storage_service.dart';
 
 /// Local notification service implementation
 class NotificationService implements NotificationServiceInterface {
   static NotificationService? _instance;
   FlutterLocalNotificationsPlugin? _localNotifications;
   bool _isInitialized = false;
+  final StorageService _storageService = StorageService.instance;
+  int? _cachedBadgeCount;
 
   /// Singleton instance
   static NotificationService get instance {
@@ -25,6 +31,9 @@ class NotificationService implements NotificationServiceInterface {
 
   /// Ensure the service is initialized before use
   void _ensureInitialized() {
+    if (isWeb) {
+      return;
+    }
     if (!_isInitialized || _localNotifications == null) {
       throw Exception(
           'NotificationService not initialized. Call initialize() first.');
@@ -37,6 +46,13 @@ class NotificationService implements NotificationServiceInterface {
     required String androidIconPath,
   }) async {
     try {
+      if (isWeb) {
+        _isInitialized = true;
+        _logMessage(
+            '[NotificationService] Web environment detected - skipping local notifications init');
+        return true;
+      }
+
       _localNotifications = FlutterLocalNotificationsPlugin();
 
       // Initialize timezone data for scheduled notifications
@@ -96,6 +112,16 @@ class NotificationService implements NotificationServiceInterface {
     DarwinNotificationDetails? iosDetailsOverride,
   }) async {
     try {
+      if (isWeb) {
+        await showWebNotification(
+          title: title,
+          body: body,
+          icon: '/icons/Icon-192.png',
+          data: payload ?? <String, dynamic>{},
+        );
+        return;
+      }
+
       _ensureInitialized();
       final NotificationDetails notificationDetails = NotificationDetails(
         android: androidDetailsOverride ??
@@ -140,6 +166,18 @@ class NotificationService implements NotificationServiceInterface {
     String? channelId,
   }) async {
     try {
+      if (isWeb) {
+        _logMessage(
+            '[NotificationService] Notification actions are not supported on web');
+        await showWebNotification(
+          title: title,
+          body: body,
+          icon: '/icons/Icon-192.png',
+          data: payload ?? <String, dynamic>{},
+        );
+        return;
+      }
+
       _ensureInitialized();
       await _localNotifications!.show(
         id,
@@ -202,6 +240,12 @@ class NotificationService implements NotificationServiceInterface {
     List<NotificationAction>? actions,
   }) async {
     try {
+      if (isWeb) {
+        _logMessage(
+            '[NotificationService] Scheduling is not supported on web - ignoring request');
+        return false;
+      }
+
       if (scheduledDate.isBefore(DateTime.now())) {
         _logMessage(
             '[NotificationService] Cannot schedule notification in the past');
@@ -254,8 +298,119 @@ class NotificationService implements NotificationServiceInterface {
   }
 
   @override
+  Future<bool> scheduleRecurringNotification({
+    required int id,
+    required String title,
+    required String body,
+    required RepeatIntervalEnum repeatInterval,
+    required DateTime initialScheduleDate,
+    Map<String, dynamic>? payload,
+    String? channelId,
+    List<NotificationAction>? actions,
+  }) async {
+    try {
+      if (isWeb) {
+        _logMessage(
+            '[NotificationService] Recurring scheduling is not supported on web');
+        return false;
+      }
+
+      _ensureInitialized();
+
+      final notificationDetails = NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId ?? 'recurring_notifications',
+          'Recurring Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+          actions: actions
+              ?.map((action) => AndroidNotificationAction(
+                    action.id,
+                    action.title,
+                    showsUserInterface: true,
+                    cancelNotification: !action.destructive,
+                  ))
+              .toList(),
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          presentBadge: false,
+        ),
+      );
+
+      final Map<String, dynamic> encodedPayload =
+          payload ?? <String, dynamic>{};
+
+      if (repeatInterval == RepeatIntervalEnum.hourly ||
+          repeatInterval == RepeatIntervalEnum.minutely) {
+        if (actions != null && actions.isNotEmpty) {
+          _logMessage(
+              '[NotificationService] Actions are not supported for periodic notifications; ignoring provided actions');
+        }
+        final RepeatInterval periodicInterval =
+            repeatInterval == RepeatIntervalEnum.hourly
+                ? RepeatInterval.hourly
+                : RepeatInterval.everyMinute;
+
+        await _localNotifications!.periodicallyShow(
+          id,
+          title,
+          body,
+          periodicInterval,
+          notificationDetails,
+          payload: jsonEncode(encodedPayload),
+        );
+
+        _logMessage(
+            '[NotificationService] Periodic notification scheduled (interval: ${repeatInterval.name}) for id: $id');
+        return true;
+      }
+
+      final tz.TZDateTime normalizedDate =
+          _normalizeScheduledDate(initialScheduleDate, repeatInterval);
+      final DateTimeComponents? matchComponents =
+          _mapRepeatIntervalToDateTimeComponents(repeatInterval);
+
+      if (matchComponents == null) {
+        _logMessage(
+            '[NotificationService] Unsupported repeat interval: ${repeatInterval.name}');
+        return false;
+      }
+
+      await _localNotifications!.zonedSchedule(
+        id,
+        title,
+        body,
+        normalizedDate,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: jsonEncode(encodedPayload),
+        matchDateTimeComponents: matchComponents,
+      );
+
+      _logMessage(
+          '[NotificationService] Recurring notification scheduled (interval: ${repeatInterval.name}) starting ${normalizedDate.toString()}');
+      return true;
+    } catch (error, stack) {
+      _logMessage(
+          '[NotificationService] Schedule recurring notification error: $error');
+      _logMessage('[NotificationService] Stack trace: $stack');
+      return false;
+    }
+  }
+
+  @override
   Future<void> cancelNotification(int id) async {
     try {
+      if (isWeb) {
+        _logMessage(
+            '[NotificationService] Cancel notification ignored on web (no local schedule)');
+        return;
+      }
+
       _ensureInitialized();
       await _localNotifications!.cancel(id);
       _logMessage('[NotificationService] Notification cancelled: $id');
@@ -268,6 +423,12 @@ class NotificationService implements NotificationServiceInterface {
   @override
   Future<void> cancelAllNotifications() async {
     try {
+      if (isWeb) {
+        _logMessage(
+            '[NotificationService] Cancel all notifications ignored on web');
+        return;
+      }
+
       _ensureInitialized();
       await _localNotifications!.cancelAll();
       _logMessage('[NotificationService] All notifications cancelled');
@@ -281,7 +442,7 @@ class NotificationService implements NotificationServiceInterface {
   @override
   Future<List<dynamic>> getPendingNotifications() async {
     try {
-      if (!kIsWeb && Platform.isAndroid) {
+      if (isAndroid) {
         _ensureInitialized();
         return await _localNotifications!.pendingNotificationRequests();
       }
@@ -298,7 +459,7 @@ class NotificationService implements NotificationServiceInterface {
   Future<void> createNotificationChannel(
       NotificationChannelData channel) async {
     try {
-      if (!kIsWeb && Platform.isAndroid) {
+      if (isAndroid) {
         await _localNotifications!
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>()
@@ -315,12 +476,54 @@ class NotificationService implements NotificationServiceInterface {
   Future<NotificationAppLaunchDetails?>
       getNotificationAppLaunchDetails() async {
     try {
+      if (isWeb) {
+        _logMessage(
+            '[NotificationService] Launch details unavailable on web platform');
+        return null;
+      }
+
       _ensureInitialized();
       return await _localNotifications!.getNotificationAppLaunchDetails();
     } catch (error, stack) {
       _logMessage('[NotificationService] Get launch details error: $error');
       _logMessage('[NotificationService] Stack trace: $stack');
       return null;
+    }
+  }
+
+  @override
+  Future<bool> isBadgeSupported() async {
+    if (isWeb) {
+      return false;
+    }
+
+    try {
+      return await FlutterAppBadger.isAppBadgeSupported();
+    } catch (error, stack) {
+      _logMessage('[NotificationService] Badge support check error: $error');
+      _logMessage('[NotificationService] Stack trace: $stack');
+      return false;
+    }
+  }
+
+  @override
+  Future<String> getWebNotificationPermissionStatus() async {
+    if (!isWeb) {
+      return 'unavailable';
+    }
+
+    try {
+      if (js.context.hasProperty('Notification')) {
+        final dynamic permission = js.context['Notification']['permission'];
+        if (permission is String) {
+          return permission;
+        }
+      }
+      return 'unknown';
+    } catch (error, stack) {
+      _logMessage('[NotificationService] Web permission status error: $error');
+      _logMessage('[NotificationService] Stack trace: $stack');
+      return 'error';
     }
   }
 
@@ -332,7 +535,7 @@ class NotificationService implements NotificationServiceInterface {
     required Map<String, dynamic> data,
   }) async {
     try {
-      if (!kIsWeb) return;
+      if (!isWeb) return;
 
       if (await _requestWebNotificationPermission()) {
         final options = js.JsObject.jsify({
@@ -368,9 +571,8 @@ class NotificationService implements NotificationServiceInterface {
   /// Sets iOS badge count
   Future<void> setIOSBadgeCount(int count) async {
     try {
-      if (!kIsWeb && Platform.isIOS) {
-        // iOS badge management implementation would go here
-        _logMessage('[NotificationService] iOS badge count set to: $count');
+      if (isIOS) {
+        await _updateBadgeCount(count);
       }
     } catch (error, stack) {
       _logMessage('[NotificationService] Set iOS badge count error: $error');
@@ -381,9 +583,8 @@ class NotificationService implements NotificationServiceInterface {
   /// Gets iOS badge count
   Future<int?> getIOSBadgeCount() async {
     try {
-      if (!kIsWeb && Platform.isIOS) {
-        // iOS badge count retrieval implementation would go here
-        return 0;
+      if (isIOS) {
+        return await _getStoredBadgeCount();
       }
     } catch (error, stack) {
       _logMessage('[NotificationService] Get iOS badge count error: $error');
@@ -395,9 +596,8 @@ class NotificationService implements NotificationServiceInterface {
   /// Sets Android badge count
   Future<void> setAndroidBadgeCount(int count) async {
     try {
-      if (!kIsWeb && Platform.isAndroid) {
-        // Android badge management implementation would go here
-        _logMessage('[NotificationService] Android badge count set to: $count');
+      if (isAndroid) {
+        await _updateBadgeCount(count);
       }
     } catch (error, stack) {
       _logMessage(
@@ -409,9 +609,8 @@ class NotificationService implements NotificationServiceInterface {
   /// Gets Android badge count
   Future<int?> getAndroidBadgeCount() async {
     try {
-      if (!kIsWeb && Platform.isAndroid) {
-        // Android badge count retrieval implementation would go here
-        return 0;
+      if (isAndroid) {
+        return await _getStoredBadgeCount();
       }
     } catch (error, stack) {
       _logMessage(
@@ -424,18 +623,152 @@ class NotificationService implements NotificationServiceInterface {
   /// Clears badge count for both platforms
   Future<void> clearBadgeCount() async {
     try {
-      if (!kIsWeb) {
-        if (Platform.isIOS) {
-          await setIOSBadgeCount(0);
-        } else if (Platform.isAndroid) {
-          _ensureInitialized();
-          await _localNotifications!.cancel(999999);
-        }
+      if (isWeb) {
+        _logMessage(
+            '[NotificationService] Badge count clearing not supported on web');
+        return;
       }
+
+      final bool supported = await FlutterAppBadger.isAppBadgeSupported();
+      if (!supported) {
+        _logMessage(
+            '[NotificationService] Badge count clearing not supported on this platform');
+        return;
+      }
+
+      await FlutterAppBadger.removeBadge();
+      await _clearStoredBadgeCount();
       _logMessage('[NotificationService] Badge count cleared');
     } catch (error, stack) {
       _logMessage('[NotificationService] Clear badge count error: $error');
       _logMessage('[NotificationService] Stack trace: $stack');
+    }
+  }
+
+  Future<bool> _updateBadgeCount(int count) async {
+    if (isWeb) {
+      _logMessage(
+          '[NotificationService] Badge updates are not available on web');
+      return false;
+    }
+
+    try {
+      final bool supported = await FlutterAppBadger.isAppBadgeSupported();
+      if (!supported) {
+        _logMessage(
+            '[NotificationService] App badges not supported on current platform');
+        return false;
+      }
+
+      await FlutterAppBadger.updateBadgeCount(count);
+      await _persistBadgeCount(count);
+      _logMessage('[NotificationService] Badge count set to: $count');
+      return true;
+    } catch (error, stack) {
+      _logMessage('[NotificationService] Update badge error: $error');
+      _logMessage('[NotificationService] Stack trace: $stack');
+      return false;
+    }
+  }
+
+  Future<void> _persistBadgeCount(int count) async {
+    _cachedBadgeCount = count;
+    try {
+      await _storageService.saveConfiguration(
+        FirebaseMessagingHandlerConstants.badgeCountPrefKey,
+        count,
+      );
+    } catch (error, stack) {
+      _logMessage('[NotificationService] Persist badge error: $error');
+      _logMessage('[NotificationService] Stack trace: $stack');
+    }
+  }
+
+  Future<int> _getStoredBadgeCount() async {
+    if (_cachedBadgeCount != null) {
+      return _cachedBadgeCount!;
+    }
+
+    try {
+      final dynamic stored = await _storageService.getConfiguration(
+        FirebaseMessagingHandlerConstants.badgeCountPrefKey,
+      );
+
+      if (stored is int) {
+        _cachedBadgeCount = stored;
+        return stored;
+      }
+      if (stored is double) {
+        final int converted = stored.toInt();
+        _cachedBadgeCount = converted;
+        return converted;
+      }
+    } catch (error, stack) {
+      _logMessage('[NotificationService] Read badge error: $error');
+      _logMessage('[NotificationService] Stack trace: $stack');
+    }
+
+    return 0;
+  }
+
+  Future<void> _clearStoredBadgeCount() async {
+    _cachedBadgeCount = 0;
+    try {
+      await _storageService.removeConfiguration(
+        FirebaseMessagingHandlerConstants.badgeCountPrefKey,
+      );
+    } catch (error, stack) {
+      _logMessage('[NotificationService] Clear badge storage error: $error');
+      _logMessage('[NotificationService] Stack trace: $stack');
+    }
+  }
+
+  tz.TZDateTime _normalizeScheduledDate(
+      DateTime initial, RepeatIntervalEnum repeatInterval) {
+    tz.TZDateTime scheduled = tz.TZDateTime.from(initial, tz.local);
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    while (scheduled.isBefore(now)) {
+      scheduled = _incrementScheduledDate(scheduled, repeatInterval);
+      if (scheduled.isAtSameMomentAs(now)) {
+        break;
+      }
+    }
+    return scheduled;
+  }
+
+  tz.TZDateTime _incrementScheduledDate(
+      tz.TZDateTime date, RepeatIntervalEnum repeatInterval) {
+    switch (repeatInterval) {
+      case RepeatIntervalEnum.daily:
+        return date.add(const Duration(days: 1));
+      case RepeatIntervalEnum.weekly:
+        return date.add(const Duration(days: 7));
+      case RepeatIntervalEnum.monthly:
+        return tz.TZDateTime(date.location, date.year, date.month + 1, date.day,
+            date.hour, date.minute, date.second);
+      case RepeatIntervalEnum.yearly:
+        return tz.TZDateTime(date.location, date.year + 1, date.month, date.day,
+            date.hour, date.minute, date.second);
+      case RepeatIntervalEnum.hourly:
+        return date.add(const Duration(hours: 1));
+      case RepeatIntervalEnum.minutely:
+        return date.add(const Duration(minutes: 1));
+    }
+  }
+
+  DateTimeComponents? _mapRepeatIntervalToDateTimeComponents(
+      RepeatIntervalEnum repeatInterval) {
+    switch (repeatInterval) {
+      case RepeatIntervalEnum.daily:
+        return DateTimeComponents.time;
+      case RepeatIntervalEnum.weekly:
+        return DateTimeComponents.dayOfWeekAndTime;
+      case RepeatIntervalEnum.monthly:
+        return DateTimeComponents.dayOfMonthAndTime;
+      case RepeatIntervalEnum.yearly:
+        return DateTimeComponents.dateAndTime;
+      default:
+        return null;
     }
   }
 
@@ -465,7 +798,7 @@ class NotificationService implements NotificationServiceInterface {
 
   Future<bool> _requestWebNotificationPermission() async {
     try {
-      if (!kIsWeb) return false;
+      if (!isWeb) return false;
 
       if (js.context.hasProperty('Notification')) {
         final notification =

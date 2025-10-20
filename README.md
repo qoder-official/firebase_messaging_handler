@@ -17,7 +17,11 @@
 - [🪄 In-App Messaging](#-in-app-messaging)
 - [🛡️ Foreground Notification Customization](#-foreground-notification-customization)
 - [📊 Analytics Integration](#-analytics-integration)
+- [🩺 Notification Diagnostics](#-notification-diagnostics)
+- [🌙 Quiet Hours & Throttling](#-quiet-hours--throttling)
+- [🔄 Data-Only Bridging](#-data-only-bridging)
 - [🧪 Testing Utilities](#-testing-utilities)
+- [📦 Payload Cookbook](#-payload-cookbook)
 - [📚 API Reference](#-api-reference)
 - [🔧 Configuration](#-configuration)
 - [🐛 Troubleshooting](#-troubleshooting)
@@ -80,6 +84,10 @@ clickStream?.listen((NotificationData? data) {
 - **🔊 Custom Sound Support** - Platform-specific sound customization
 - **📊 Built-in Analytics** - Track all notification events automatically
 - **🧪 Testing Utilities** - Mock data and streams for comprehensive testing
+- **🩺 Notification Doctor** - Diagnose permissions, tokens, badges, and background wiring in seconds
+- **🌐 Web-Safe Fallbacks** - Gracefully degrade scheduling/actions/badges when unsupported in browsers
+- **🌙 Quiet Hours & Frequency Caps** - Control delivery cadence with lifecycle-aware helpers
+- **🔄 Data-Only Bridging** - Promote silent payloads into local notifications when needed
 - **🪄 In-App Messaging** - Trigger rich in-app templates from silent FCM payloads
 - **🛡️ Foreground Controls** - Fully customize fallback foreground notifications
 - **🎭 In-App Templates** - Welcome, promotion, alert, success, and info templates
@@ -144,7 +152,15 @@ dependencies:
    );
    ```
 
-4. **Done!** Your app now handles Firebase notifications.
+4. **(Optional) Wire the background handler:**
+   ```dart
+   await FirebaseMessagingHandler.instance.configureBackgroundMessageHandler(
+     firebaseMessagingHandlerBackgroundDispatcher,
+   );
+   ```
+   > Use your own top-level handler if you need custom logic—just remember to call `FirebaseMessagingHandler.handleBackgroundMessage(message)` first.
+
+5. **Done!** Your app now handles Firebase notifications.
 
 ### **🎯 Minimal Setup (Basic Notifications Only)**
 
@@ -304,6 +320,8 @@ Add to `web/index.html`:
 <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging.js"></script>
 ```
+
+> **Browser caveats:** Browsers do not support local scheduling, notification action buttons, or app-icon badges. Calls to those APIs are safely ignored and surfaced by the diagnostics helper.
 
 ## 📖 **Usage Examples**
 
@@ -1137,6 +1155,116 @@ FirebaseMessagingHandler.instance.trackAnalyticsEvent('custom_event', {
 });
 ```
 
+## 🩺 **Notification Diagnostics**
+
+Stay ahead of production issues with a built-in "notification doctor". It inspects permissions, token state, badge capabilities, web support, and background wiring in one call.
+
+### **Run the Doctor**
+
+```dart
+final diagnostics = await FirebaseMessagingHandler.instance.runDiagnostics();
+
+debugPrint('Notification diagnostics: ${diagnostics.toMap()}');
+
+if (!diagnostics.success || diagnostics.recommendations.isNotEmpty) {
+  for (final recommendation in diagnostics.recommendations) {
+    debugPrint('Recommendation → $recommendation');
+  }
+}
+```
+
+**What you get:**
+
+- `permissionsGranted` and `authorizationStatus` – current notification permission state.
+- `fcmTokenAvailable` – whether a token is cached via `updateTokenCallback`.
+- `badgeSupported` – launcher/platform badge capability (best-effort on Android).
+- `webNotificationsAllowed` / `metadata['webPermission']` – browser permission string.
+- `metadata['backgroundHandlerRegistered']` – confirms `configureBackgroundMessageHandler` has been invoked.
+- `pendingNotificationCount` – number of locally scheduled notifications.
+
+### **Background Message Helper**
+
+Register a top-level handler once and reuse the plugin’s pipeline inside the isolate:
+
+```dart
+@pragma('vm:entry-point')
+Future<void> myBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseMessagingHandler.handleBackgroundMessage(message);
+
+  // Custom logic: update analytics, hydrate local cache, etc.
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await FirebaseMessagingHandler.instance.configureBackgroundMessageHandler(
+    myBackgroundHandler,
+  );
+
+  runApp(const MyApp());
+}
+```
+
+> **Tip:** Prefer the built-in `firebaseMessagingHandlerBackgroundDispatcher` if you simply want to hydrate the plugin without extra logic:
+>
+> ```dart
+> await FirebaseMessagingHandler.instance.configureBackgroundMessageHandler(
+>   firebaseMessagingHandlerBackgroundDispatcher,
+> );
+> ```
+
+### **Web Safeguards**
+
+Scheduling, interactive actions, and app-icon badges are not available in browsers. The doctor highlights these limitations and the runtime API logs “ignored” warnings so you can branch logic per platform.
+
+## 🌙 **Quiet Hours & Throttling**
+
+Control when in-app messages surface and how frequently campaigns fire.
+
+```dart
+await FirebaseMessagingHandler.instance.setInAppDeliveryPolicy(
+  const InAppDeliveryPolicy(
+    globalInterval: Duration(seconds: 30),
+    perTemplateInterval: Duration(minutes: 2),
+    perTemplateDailyCap: 5,
+    quietHours: InAppQuietHours(startHour: 22, endHour: 7),
+  ),
+);
+```
+
+- `globalInterval` enforces a cool-down between any two in-app presentations.
+- `perTemplateInterval` keeps the same template from spamming the timeline.
+- `perTemplateDailyCap` limits impressions per template per day.
+- `quietHours` defers delivery until the configured window closes. Deferred payloads are re-queued automatically with the diagnostics report showing their status.
+
+## 🔄 **Data-Only Bridging**
+
+Promote silent payloads into local notifications (or custom flows) so users still see timely updates.
+
+```dart
+// Promote data-only FCM payloads to local notifications automatically
+FirebaseMessagingHandler.instance.enableDefaultDataOnlyBridge(
+  channelId: 'actions_channel',
+  titleKey: 'title',
+  bodyKey: 'body',
+);
+
+// Or wire your own handler and decide when work is complete
+await FirebaseMessagingHandler.instance.configureBackgroundProcessingCallback(
+  (RemoteMessage message) async {
+    if (message.data['should_defer'] == 'true') {
+      return false; // enqueue for retry when app wakes up
+    }
+
+    // Custom processing…
+    return true;
+  },
+);
+```
+
+Use `FirebaseMessagingHandler.handleBackgroundMessage(message)` inside your top-level background function to hydrate local queues before running custom logic.
+
 ## 🧪 **Testing Utilities**
 
 ### **Mock Data Generation**
@@ -1177,6 +1305,68 @@ FirebaseMessagingHandler.addMockClickEvent(mockData);
 
 // Reset mock data
 FirebaseMessagingHandler.resetMockData();
+```
+
+## 📦 **Payload Cookbook**
+
+Jump-start backend integration with ready-to-send payloads:
+
+### **Interactive Notification (Actions + Analytics)**
+
+```json
+{
+  "message": {
+    "token": "<device-token>",
+    "notification": {
+      "title": "New Support Ticket",
+      "body": "Tap Reply to follow up without opening the app."
+    },
+    "data": {
+      "is_action": true,
+      "action_id": "reply",
+      "action_payload": {"ticket_id": "12345"},
+      "analytics": {"campaign": "support_reengage"}
+    }
+  }
+}
+```
+
+### **Data-Only → Local Notification Bridge**
+
+```json
+{
+  "message": {
+    "token": "<device-token>",
+    "data": {
+      "title": "Inventory Update",
+      "body": "SKU #48319 is back in stock!",
+      "deep_link": "app://inventory/48319"
+    }
+  }
+}
+```
+
+### **In-App Template Trigger**
+
+```json
+{
+  "message": {
+    "token": "<device-token>",
+    "data": {
+      "fcmh_inapp": {
+        "id": "promo-2025",
+        "templateId": "builtin_generic",
+        "trigger": "immediate",
+        "content": {
+          "layout": "html_modal",
+          "title": "Spring Launch",
+          "html": "<h2>Fresh features</h2><p>Try quiet hours + notification doctor today.</p>",
+          "buttons": [{"id": "explore", "label": "Explore", "style": "filled"}]
+        }
+      }
+    }
+  }
+}
 ```
 
 ## 📚 **API Reference**
@@ -1244,6 +1434,17 @@ Future<bool> scheduleRecurringNotification({
   Map<String, dynamic>? payload,
   List<NotificationAction>? actions,
 })
+```
+
+#### **Background Handling & Diagnostics**
+```dart
+Future<void> configureBackgroundMessageHandler(
+  Future<void> Function(RemoteMessage message) handler,
+)
+
+static Future<void> handleBackgroundMessage(RemoteMessage message)
+
+Future<NotificationDiagnosticsResult> runDiagnostics()
 ```
 
 #### **Badge Management**

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
@@ -97,6 +98,27 @@ class NotificationService {
       _notificationProvider.setInitialized(true);
       debugPrint('Firebase Messaging Handler initialized successfully');
       _notificationProvider.addActivity('Handler initialized');
+
+      await _messagingHandler.setInAppDeliveryPolicy(
+        const InAppDeliveryPolicy(
+          globalInterval: Duration(seconds: 20),
+          perTemplateInterval: Duration(minutes: 1),
+          perTemplateDailyCap: 8,
+          quietHours: InAppQuietHours(startHour: 22, endHour: 7),
+        ),
+      );
+
+      await _messagingHandler.configureBackgroundProcessingCallback(
+        (RemoteMessage message) async {
+          _notificationProvider.addActivity(
+              'Background callback processed ${message.messageId ?? 'unknown'}');
+          return true;
+        },
+      );
+
+      _messagingHandler.enableDefaultDataOnlyBridge(
+        channelId: 'actions_channel',
+      );
     } catch (e) {
       debugPrint('Error initializing Firebase Messaging Handler: $e');
       _notificationProvider.setInitialized(false);
@@ -346,6 +368,22 @@ class NotificationService {
       channelId: 'default_channel',
     );
     _notificationProvider.addActivity('Created notification group demo');
+  }
+
+  Future<void> triggerDataOnlyBridge() async {
+    final RemoteMessage mockMessage =
+        FirebaseMessagingHandler.createMockRemoteMessage(
+      messageId: 'data_bridge_${DateTime.now().millisecondsSinceEpoch}',
+      data: {
+        'title': 'Data-only Promotion',
+        'body': 'This data payload was promoted to a local notification.',
+        'deep_link': 'app://notifications/data-only',
+      },
+    );
+
+    await FirebaseMessagingHandler.handleBackgroundMessage(mockMessage);
+    _notificationProvider.addActivity(
+        'Triggered data-only message bridge and local notification');
   }
 
   Future<void> updateBadges() async {

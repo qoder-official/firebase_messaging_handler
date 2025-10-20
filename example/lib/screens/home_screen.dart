@@ -150,6 +150,25 @@ const Map<String, String> _templateSamples = {
     ]
   }
 }
+''',
+  'HTML Spotlight': '''
+{
+  "id": "demo-html-modal",
+  "templateId": "builtin_generic",
+  "trigger": "immediate",
+  "content": {
+    "layout": "html_modal",
+    "title": "Release Notes",
+    "html": "<h2>What's new</h2><ul><li>Data-only bridging</li><li>Quiet hours</li><li>Notification doctor</li></ul>",
+    "imageUrl": "https://via.placeholder.com/1200x500/0F172A/FFFFFF?text=Release",
+    "buttons": [
+      {"id": "dismiss", "label": "Close", "style": "filled", "dismissOnly": true}
+    ],
+    "backgroundColor": "#111827",
+    "textColor": "#F8FAFC",
+    "autoDismissSeconds": 0
+  }
+}
 '''
 };
 
@@ -158,6 +177,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _templatesRegistered = false;
   late TextEditingController _templateController;
   String _selectedTemplate = _templateSamples.keys.first;
+  NotificationDiagnosticsResult? _latestDiagnostics;
+  bool _diagnosticsLoading = false;
 
   @override
   void initState() {
@@ -212,6 +233,140 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     _templatesRegistered = true;
+  }
+
+  Future<void> _runDiagnostics() async {
+    if (_diagnosticsLoading) return;
+    setState(() => _diagnosticsLoading = true);
+
+    try {
+      final result = await FirebaseMessagingHandler.instance.runDiagnostics();
+      if (!mounted) return;
+      setState(() {
+        _diagnosticsLoading = false;
+        _latestDiagnostics = result;
+      });
+      _showDiagnosticsSheet(result);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _diagnosticsLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Diagnostics failed: $error'),
+        ),
+      );
+    }
+  }
+
+  void _showDiagnosticsSheet(NotificationDiagnosticsResult result) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final metadata = result.metadata;
+
+        final entries = [
+          _buildDiagnosticsRow(
+            'Permissions',
+            '${result.permissionsGranted ? 'Granted' : 'Not granted'} '
+                '(${result.authorizationStatus})',
+            result.permissionsGranted,
+          ),
+          _buildDiagnosticsRow(
+            'Stored FCM token',
+            result.fcmTokenAvailable
+                ? 'Token cached locally'
+                : 'No token saved',
+            result.fcmTokenAvailable,
+          ),
+          _buildDiagnosticsRow(
+            'Badge support',
+            result.badgeSupported
+                ? 'App icon badges available on ${result.platform}'
+                : 'Badges unsupported on this platform/launcher',
+            result.badgeSupported,
+          ),
+          _buildDiagnosticsRow(
+            'Background handler',
+            metadata['backgroundHandlerRegistered'] == true
+                ? 'Registered via configureBackgroundMessageHandler'
+                : 'No background handler registered',
+            metadata['backgroundHandlerRegistered'] == true,
+          ),
+          _buildDiagnosticsRow(
+            'Pending notifications',
+            '${result.pendingNotificationCount} scheduled locally',
+            result.pendingNotificationCount < 16,
+          ),
+          if (metadata['webPermission'] != null)
+            _buildDiagnosticsRow(
+              'Web notification permission',
+              metadata['webPermission'] as String,
+              metadata['webPermission'] == 'granted',
+            ),
+        ];
+
+        final recommendations = result.recommendations;
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Notification Doctor',
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Platform: ${result.platform}',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 16),
+                ...entries,
+                if (recommendations.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    'Recommendations',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  ...recommendations.map(
+                    (item) => ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.arrow_right, size: 20),
+                      title: Text(item),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDiagnosticsRow(String label, String description, bool status) {
+    final color = status ? Colors.green : Colors.orange;
+    final icon = status ? Icons.check_circle_outline : Icons.error_outline;
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: color),
+      title: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(description),
+    );
   }
 
   @override
@@ -317,6 +472,41 @@ class _HomeScreenState extends State<HomeScreen> {
                         body:
                             'Calls createNotificationGroup with three NotificationData instances so you can inspect '
                             'group summaries and taps inside the Scenario screen.',
+                      ),
+                    ),
+                    FeatureCard(
+                      title: 'Data-Only Bridge',
+                      description:
+                          'Converts a data-only payload into a local notification using the bridge.',
+                      icon: Icons.wifi_tethering,
+                      color: Colors.indigo,
+                      onTap: _notificationService.triggerDataOnlyBridge,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Data-Only Bridge',
+                        body:
+                            'Invokes enableDefaultDataOnlyBridge and simulates a background data payload. The handler '
+                            'promotes it into a local notification so users still see a banner.',
+                      ),
+                    ),
+                    FeatureCard(
+                      title: 'Notification Doctor',
+                      description: _diagnosticsLoading
+                          ? 'Running environment checks...'
+                          : _latestDiagnostics == null
+                              ? 'Runs diagnostics for permissions, token, badges & web capabilities.'
+                              : _latestDiagnostics!.recommendations.isEmpty
+                                  ? 'Last run: All systems look good.'
+                                  : 'Last run highlighted ${_latestDiagnostics!.recommendations.length} improvement(s).',
+                      icon: Icons.medical_information,
+                      color: Colors.teal,
+                      onTap: _diagnosticsLoading ? null : _runDiagnostics,
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Notification Doctor',
+                        body:
+                            'Invokes FirebaseMessagingHandler.runDiagnostics to verify permissions, tokens, badges, '
+                            'web capabilities, and background handler wiring. Helpful when validating production builds.',
                       ),
                     ),
                   ],

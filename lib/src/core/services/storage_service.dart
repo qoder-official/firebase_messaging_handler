@@ -213,7 +213,10 @@ class StorageService implements StorageServiceInterface {
    * is unavailable, so we stage them in local storage and hydrate the stream later.
    */
   @override
-  Future<void> savePendingInAppMessage(Map<String, dynamic> message) async {
+  Future<void> savePendingInAppMessage(
+    Map<String, dynamic> message, {
+    DateTime? nextEligibleAt,
+  }) async {
     try {
       await _initialize();
       final String? stored = _prefs!
@@ -221,6 +224,12 @@ class StorageService implements StorageServiceInterface {
       final List<Map<String, dynamic>> existing = stored != null
           ? List<Map<String, dynamic>>.from(jsonDecode(stored) as List)
           : <Map<String, dynamic>>[];
+      if (nextEligibleAt != null) {
+        message = Map<String, dynamic>.from(message)
+          ..['__nextEligibleAt'] = nextEligibleAt.toIso8601String();
+      }
+      existing.removeWhere(
+          (Map<String, dynamic> item) => item['id'] == message['id']);
       existing.add(message);
       await _prefs!.setString(
         FirebaseMessagingHandlerConstants.inAppMessagesPrefKey,
@@ -279,6 +288,132 @@ class StorageService implements StorageServiceInterface {
     } catch (error, stack) {
       _logMessage(
           '[StorageService] Clear pending in-app messages error: $error');
+      _logMessage('[StorageService] Stack trace: $stack');
+    }
+  }
+
+  @override
+  Future<void> setPendingInAppMessages(
+      List<Map<String, dynamic>> messages) async {
+    try {
+      await _initialize();
+      await _prefs!.setString(
+        FirebaseMessagingHandlerConstants.inAppMessagesPrefKey,
+        jsonEncode(messages),
+      );
+    } catch (error, stack) {
+      _logMessage('[StorageService] Set pending in-app error: $error');
+      _logMessage('[StorageService] Stack trace: $stack');
+    }
+  }
+
+  @override
+  Future<void> saveInAppDeliveryHistory(Map<String, dynamic> history) async {
+    try {
+      await _initialize();
+      await _prefs!.setString(
+        FirebaseMessagingHandlerConstants.inAppDeliveryHistoryPrefKey,
+        jsonEncode(history),
+      );
+      _logMessage('[StorageService] In-app delivery history saved');
+    } catch (error, stack) {
+      _logMessage('[StorageService] Save delivery history error: $error');
+      _logMessage('[StorageService] Stack trace: $stack');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getInAppDeliveryHistory() async {
+    try {
+      await _initialize();
+      final String? stored = _prefs!.getString(
+          FirebaseMessagingHandlerConstants.inAppDeliveryHistoryPrefKey);
+      if (stored == null) {
+        return <String, dynamic>{};
+      }
+      return Map<String, dynamic>.from(jsonDecode(stored) as Map);
+    } catch (error, stack) {
+      _logMessage('[StorageService] Get delivery history error: $error');
+      _logMessage('[StorageService] Stack trace: $stack');
+      return <String, dynamic>{};
+    }
+  }
+
+  @override
+  Future<void> clearInAppDeliveryHistory() async {
+    try {
+      await _initialize();
+      await _prefs!.remove(
+          FirebaseMessagingHandlerConstants.inAppDeliveryHistoryPrefKey);
+    } catch (error, stack) {
+      _logMessage('[StorageService] Clear delivery history error: $error');
+      _logMessage('[StorageService] Stack trace: $stack');
+    }
+  }
+
+  @override
+  Future<void> saveQueuedBackgroundMessage(Map<String, dynamic> message) async {
+    try {
+      await _initialize();
+      final String? stored = _prefs!.getString(
+          FirebaseMessagingHandlerConstants.backgroundMessageQueuePrefKey);
+      final List<Map<String, dynamic>> existing = stored != null
+          ? List<Map<String, dynamic>>.from(jsonDecode(stored) as List)
+          : <Map<String, dynamic>>[];
+      existing.removeWhere((Map<String, dynamic> item) =>
+          item['messageId'] == message['messageId']);
+      existing.add(message);
+      await _prefs!.setString(
+        FirebaseMessagingHandlerConstants.backgroundMessageQueuePrefKey,
+        jsonEncode(existing),
+      );
+      _logMessage('[StorageService] Queued background message stored');
+    } catch (error, stack) {
+      _logMessage('[StorageService] Save queued background error: $error');
+      _logMessage('[StorageService] Stack trace: $stack');
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getQueuedBackgroundMessages() async {
+    try {
+      await _initialize();
+      final String? stored = _prefs!.getString(
+          FirebaseMessagingHandlerConstants.backgroundMessageQueuePrefKey);
+      if (stored == null) {
+        return <Map<String, dynamic>>[];
+      }
+      final List<dynamic> decoded = jsonDecode(stored) as List<dynamic>;
+      return decoded
+          .map<Map<String, dynamic>>(
+              (dynamic item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (error, stack) {
+      _logMessage('[StorageService] Get queued background error: $error');
+      _logMessage('[StorageService] Stack trace: $stack');
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  @override
+  Future<void> clearQueuedBackgroundMessages({String? messageId}) async {
+    try {
+      await _initialize();
+      if (messageId == null) {
+        await _prefs!.remove(
+            FirebaseMessagingHandlerConstants.backgroundMessageQueuePrefKey);
+        return;
+      }
+      final List<Map<String, dynamic>> existing =
+          await getQueuedBackgroundMessages();
+      existing.removeWhere(
+          (Map<String, dynamic> item) => item['messageId'] == messageId);
+      await _prefs!.setString(
+        FirebaseMessagingHandlerConstants.backgroundMessageQueuePrefKey,
+        jsonEncode(existing),
+      );
+    } catch (error, stack) {
+      _logMessage('[StorageService] Clear queued background error: $error');
       _logMessage('[StorageService] Stack trace: $stack');
     }
   }

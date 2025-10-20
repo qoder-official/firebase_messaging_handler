@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../interfaces/analytics_service_interface.dart';
+import '../utils/platform_utils.dart';
 
 /// Analytics service implementation
 class AnalyticsService implements AnalyticsServiceInterface {
@@ -45,10 +45,14 @@ class AnalyticsService implements AnalyticsServiceInterface {
 
   @override
   String getCurrentPlatform() {
-    if (kIsWeb) return 'web';
-    if (Platform.isAndroid) return 'android';
-    if (Platform.isIOS) return 'ios';
-    return 'unknown';
+    if (isWeb) return 'web';
+    if (isAndroid) return 'android';
+    if (isIOS) return 'ios';
+    if (isMacOS) return 'macos';
+    if (isWindows) return 'windows';
+    if (isLinux) return 'linux';
+    if (isFuchsia) return 'fuchsia';
+    return isWeb ? 'web' : 'unknown';
   }
 
   @override

@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../interfaces/fcm_service_interface.dart';
+import '../utils/platform_utils.dart';
 
 /// Firebase Cloud Messaging service implementation
 class FCMService implements FCMServiceInterface {
@@ -65,7 +65,7 @@ class FCMService implements FCMServiceInterface {
           await _firebaseMessaging!.getToken(vapidKey: vapidKey);
 
       // Handle APNs token error on iOS simulators
-      if (token == null && !kIsWeb && Platform.isIOS) {
+      if (token == null && isIOS) {
         _logMessage(
             '[FCMService] APNs token not available (normal on iOS simulators)');
         return 'mock_fcm_token_simulator_${DateTime.now().millisecondsSinceEpoch}';
@@ -79,7 +79,7 @@ class FCMService implements FCMServiceInterface {
       _logMessage('[FCMService] Stack trace: $stack');
 
       // Handle APNs token error specifically
-      if (error.toString().contains('apns-token-not-set')) {
+      if (isIOS && error.toString().contains('apns-token-not-set')) {
         _logMessage(
             '[FCMService] APNs token not set - this is normal on iOS simulators or when APNs is not configured');
         return 'mock_fcm_token_apns_not_set_${DateTime.now().millisecondsSinceEpoch}';
@@ -166,6 +166,44 @@ class FCMService implements FCMServiceInterface {
 
   @override
   Stream<RemoteMessage> get onBackgroundMessage => const Stream.empty();
+
+  @override
+  Stream<String> get onTokenRefresh =>
+      FirebaseMessaging.instance.onTokenRefresh;
+
+  @override
+  Future<NotificationSettings> getNotificationSettings() async {
+    try {
+      if (!_isInitialized) {
+        await initialize();
+      }
+
+      return await _firebaseMessaging!.getNotificationSettings();
+    } catch (error, stack) {
+      _logMessage('[FCMService] Get notification settings error: $error');
+      _logMessage('[FCMService] Stack trace: $stack');
+      return const NotificationSettings(
+        alert: AppleNotificationSetting.notSupported,
+        announcement: AppleNotificationSetting.notSupported,
+        authorizationStatus: AuthorizationStatus.notDetermined,
+        badge: AppleNotificationSetting.notSupported,
+        carPlay: AppleNotificationSetting.notSupported,
+        lockScreen: AppleNotificationSetting.notSupported,
+        notificationCenter: AppleNotificationSetting.notSupported,
+        showPreviews: AppleShowPreviewSetting.notSupported,
+        timeSensitive: AppleNotificationSetting.notSupported,
+        criticalAlert: AppleNotificationSetting.notSupported,
+        sound: AppleNotificationSetting.notSupported,
+        providesAppNotificationSettings: AppleNotificationSetting.notSupported,
+      );
+    }
+  }
+
+  @override
+  Future<void> setBackgroundMessageHandler(
+      Future<void> Function(RemoteMessage message) handler) async {
+    FirebaseMessaging.onBackgroundMessage(handler);
+  }
 
   @override
   Future<void> setForegroundNotificationPresentationOptions({

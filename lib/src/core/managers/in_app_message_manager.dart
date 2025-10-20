@@ -22,6 +22,11 @@ class InAppMessageManager {
 
   final StorageService _storageService = StorageService.instance;
   final AnalyticsService _analyticsService = AnalyticsService.instance;
+  InAppDeliveryPolicy _deliveryPolicy = const InAppDeliveryPolicy();
+  final Map<String, InAppDeliveryStats> _deliveryStats =
+      <String, InAppDeliveryStats>{};
+  InAppDeliveryStats _globalDeliveryStats = InAppDeliveryStats();
+  bool _hasHydratedDeliveryHistory = false;
 
   final Map<String, InAppNotificationTemplate> _templates =
       <String, InAppNotificationTemplate>{};
@@ -72,6 +77,12 @@ class InAppMessageManager {
     _fallbackDisplay = fallbackDisplay;
   }
 
+  Future<void> setDeliveryPolicy(InAppDeliveryPolicy policy) async {
+    await _ensureDeliveryHistoryLoaded();
+    _deliveryPolicy = policy;
+    await _persistDeliveryHistory();
+  }
+
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
     InAppTemplatePresenter.instance.configure(navigatorKey: key);
   }
@@ -103,7 +114,7 @@ class InAppMessageManager {
 
     switch (data.triggerType) {
       case InAppTriggerTypeEnum.immediate:
-        _dispatch(data);
+        await _present(data);
         break;
       case InAppTriggerTypeEnum.nextForeground:
       case InAppTriggerTypeEnum.appLaunch:
@@ -114,7 +125,7 @@ class InAppMessageManager {
          * Why: Custom triggers are user-defined; we surface them immediately so the host
          * app can decide when and how to render based on its own heuristics.
          */
-        _dispatch(data);
+        await _present(data);
         break;
     }
   }
@@ -142,42 +153,79 @@ class InAppMessageManager {
       'trigger_type': data.triggerType.name,
       'manual': true,
     });
-    _dispatch(data);
+    await _present(data);
   }
 
-  Future<void> _enqueuePending(InAppNotificationData data) async {
+  Future<void> _enqueuePending(InAppNotificationData data,
+      {DateTime? nextEligibleAt}) async {
     _pendingMemoryQueue.add(data);
-    await _storageService.savePendingInAppMessage(data.toMap());
-    _logMessage(
-        '[InAppMessageManager] Pending in-app message queued: ${data.id}');
+    await _storageService.savePendingInAppMessage(
+      data.toMap(),
+      nextEligibleAt: nextEligibleAt,
+    );
+    _logMessage('[InAppMessageManager] Pending in-app message queued: '
+        '${data.id} (next eligible: ${nextEligibleAt?.toIso8601String() ?? 'immediate'})');
   }
 
   Future<void> _deliverPendingFromStorage() async {
-    if (_hasHydratedStorage) {
-      return;
+    if (!_hasHydratedStorage) {
+      _hasHydratedStorage = true;
     }
-    _hasHydratedStorage = true;
-
     final List<Map<String, dynamic>> stored =
         await _storageService.getPendingInAppMessages();
     if (stored.isEmpty) {
       return;
     }
 
+    final DateTime now = DateTime.now();
+    final List<Map<String, dynamic>> remaining = <Map<String, dynamic>>[];
+
     for (final Map<String, dynamic> item in stored) {
       try {
+        final String? nextEligibleRaw = item['__nextEligibleAt'] as String?;
+        final DateTime? nextEligibleAt =
+            nextEligibleRaw != null ? DateTime.tryParse(nextEligibleRaw) : null;
+        if (nextEligibleAt != null && nextEligibleAt.isAfter(now)) {
+          remaining.add(item);
+          continue;
+        }
         final InAppNotificationData data = InAppNotificationData.fromMap(item);
-        _dispatch(data);
-        await _storageService.clearPendingInAppMessages(id: data.id);
+        await _present(data);
       } catch (error, stack) {
         _logMessage(
             '[InAppMessageManager] Pending message hydration error: $error');
         _logMessage('[InAppMessageManager] Stack trace: $stack');
       }
     }
+
+    if (remaining.isEmpty) {
+      await _storageService.clearPendingInAppMessages();
+    } else {
+      await _storageService.setPendingInAppMessages(remaining);
+    }
   }
 
-  void _dispatch(InAppNotificationData data) {
+  Future<void> _present(InAppNotificationData data) async {
+    await _ensureDeliveryHistoryLoaded();
+    final DateTime now = DateTime.now();
+    final InAppDeliveryDecision decision =
+        _evaluateDeliveryDecision(data.templateId, now);
+
+    if (!decision.allowed) {
+      if (decision.nextEligibleAt != null) {
+        await _enqueuePending(data, nextEligibleAt: decision.nextEligibleAt);
+      }
+      _logMessage('[InAppMessageManager] Delivery deferred for ${data.id}: '
+          '${decision.reason ?? 'policy'}');
+      return;
+    }
+
+    _registerDelivery(data.templateId, now);
+    await _persistDeliveryHistory();
+    _emit(data);
+  }
+
+  void _emit(InAppNotificationData data) {
     if (_streamController == null || !_streamController!.hasListener) {
       _pendingMemoryQueue.add(data);
     } else {
@@ -291,8 +339,146 @@ class InAppMessageManager {
     );
   }
 
+  Future<void> _ensureDeliveryHistoryLoaded() async {
+    if (_hasHydratedDeliveryHistory) {
+      return;
+    }
+    final Map<String, dynamic> stored =
+        await _storageService.getInAppDeliveryHistory();
+    stored.forEach((String key, dynamic value) {
+      final Map<String, dynamic> map =
+          Map<String, dynamic>.from(value as Map? ?? <String, dynamic>{});
+      final DateTime? lastShown = map['lastShown'] != null
+          ? DateTime.tryParse(map['lastShown'] as String)
+          : null;
+      final Map<String, int> perDayCounts = <String, int>{};
+      final Map<String, dynamic> counts =
+          Map<String, dynamic>.from(map['perDayCounts'] as Map? ?? {});
+      counts.forEach((String k, dynamic v) {
+        perDayCounts[k] = (v as num).toInt();
+      });
+      final stats =
+          InAppDeliveryStats(lastShown: lastShown, perDayCounts: perDayCounts);
+      if (key == '__global') {
+        _globalDeliveryStats = stats;
+      } else {
+        _deliveryStats[key] = stats;
+      }
+    });
+    _hasHydratedDeliveryHistory = true;
+  }
+
+  Future<void> _persistDeliveryHistory() async {
+    if (!_hasHydratedDeliveryHistory) {
+      return;
+    }
+    final Map<String, dynamic> payload = <String, dynamic>{
+      '__global': _statsToMap(_globalDeliveryStats),
+    };
+    _deliveryStats.forEach((String key, InAppDeliveryStats stats) {
+      payload[key] = _statsToMap(stats);
+    });
+    await _storageService.saveInAppDeliveryHistory(payload);
+  }
+
+  Map<String, dynamic> _statsToMap(InAppDeliveryStats stats) =>
+      <String, dynamic>{
+        'lastShown': stats.lastShown?.toIso8601String(),
+        'perDayCounts': stats.perDayCounts,
+      };
+
+  InAppDeliveryDecision _evaluateDeliveryDecision(
+      String templateId, DateTime now) {
+    final InAppDeliveryStats templateStats =
+        _deliveryStats.putIfAbsent(templateId, () => InAppDeliveryStats());
+
+    if (_deliveryPolicy.quietHours?.isQuiet(now) ?? false) {
+      final DateTime next =
+          _deliveryPolicy.quietHours!.nextAllowedTime(now).toLocal();
+      return InAppDeliveryDecision.defer(
+        nextEligibleAt: next,
+        reason: 'quiet_hours',
+      );
+    }
+
+    if (_deliveryPolicy.globalInterval != null &&
+        _globalDeliveryStats.lastShown != null) {
+      final DateTime eligible =
+          _globalDeliveryStats.lastShown!.add(_deliveryPolicy.globalInterval!);
+      if (eligible.isAfter(now)) {
+        return InAppDeliveryDecision.defer(
+          nextEligibleAt: eligible,
+          reason: 'global_interval',
+        );
+      }
+    }
+
+    if (_deliveryPolicy.perTemplateInterval != null &&
+        templateStats.lastShown != null) {
+      final DateTime eligible =
+          templateStats.lastShown!.add(_deliveryPolicy.perTemplateInterval!);
+      if (eligible.isAfter(now)) {
+        return InAppDeliveryDecision.defer(
+          nextEligibleAt: eligible,
+          reason: 'template_interval',
+        );
+      }
+    }
+
+    final int templateCountToday = templateStats.countForDay(now);
+    if (_deliveryPolicy.perTemplateDailyCap != null &&
+        templateCountToday >= _deliveryPolicy.perTemplateDailyCap!) {
+      final DateTime nextDay =
+          DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+      return InAppDeliveryDecision.defer(
+        nextEligibleAt: nextDay,
+        reason: 'template_daily_cap',
+      );
+    }
+
+    final int globalCountToday = _globalDeliveryStats.countForDay(now);
+    if (_deliveryPolicy.globalDailyCap != null &&
+        globalCountToday >= _deliveryPolicy.globalDailyCap!) {
+      final DateTime nextDay =
+          DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+      return InAppDeliveryDecision.defer(
+        nextEligibleAt: nextDay,
+        reason: 'global_daily_cap',
+      );
+    }
+
+    return InAppDeliveryDecision.allow;
+  }
+
+  void _registerDelivery(String templateId, DateTime now) {
+    final InAppDeliveryStats templateStats =
+        _deliveryStats.putIfAbsent(templateId, () => InAppDeliveryStats());
+    templateStats.register(now);
+    _globalDeliveryStats.register(now);
+  }
+
   String _generateTempId() =>
       'inapp_${DateTime.now().microsecondsSinceEpoch}_${_processedMessageIds.length}';
+
+  Map<String, dynamic> getDeliveryDiagnostics(DateTime now) {
+    final InAppQuietHours? quietHours = _deliveryPolicy.quietHours;
+    return <String, dynamic>{
+      'quietHoursActive': quietHours?.isQuiet(now) ?? false,
+      'quietHours': quietHours == null
+          ? null
+          : {
+              'startHour': quietHours.startHour,
+              'startMinute': quietHours.startMinute,
+              'endHour': quietHours.endHour,
+              'endMinute': quietHours.endMinute,
+            },
+      'globalIntervalSeconds': _deliveryPolicy.globalInterval?.inSeconds,
+      'perTemplateIntervalSeconds':
+          _deliveryPolicy.perTemplateInterval?.inSeconds,
+      'globalDailyCap': _deliveryPolicy.globalDailyCap,
+      'perTemplateDailyCap': _deliveryPolicy.perTemplateDailyCap,
+    };
+  }
 
   void _logMessage(String message) {
     if (kDebugMode) {

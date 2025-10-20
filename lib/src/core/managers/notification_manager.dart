@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -10,6 +9,11 @@ import 'in_app_message_manager.dart';
 import '../../models/export.dart';
 import '../../enums/export.dart';
 import '../../extensions/export.dart';
+import '../utils/platform_utils.dart';
+
+typedef BackgroundMessageCallback = Future<bool> Function(
+    RemoteMessage message);
+typedef DataOnlyMessageBridge = Future<void> Function(RemoteMessage message);
 
 /// Manager class for handling notification lifecycle and operations
 class NotificationManager {
@@ -31,6 +35,11 @@ class NotificationManager {
   final InAppMessageManager _inAppMessageManager = InAppMessageManager.instance;
   ForegroundNotificationOptions _foregroundOptions =
       ForegroundNotificationOptions.defaults;
+  StreamSubscription<String>? _tokenRefreshSubscription;
+  bool _backgroundHandlerRegistered = false;
+  BackgroundMessageCallback? _backgroundMessageCallback;
+  DataOnlyMessageBridge? _dataOnlyMessageBridge;
+  bool _isReplayingBackgroundQueue = false;
 
   // Stream controllers
   StreamController<NotificationData?>? _clickStreamController;
@@ -67,6 +76,13 @@ class NotificationManager {
       // Handle FCM token
       await _handleFCMToken(senderId, updateTokenCallback);
 
+      if (updateTokenCallback != null) {
+        _listenForTokenRefresh(updateTokenCallback);
+      } else {
+        await _tokenRefreshSubscription?.cancel();
+        _tokenRefreshSubscription = null;
+      }
+
       // Set up notification listeners
       _setupNotificationListeners(androidChannels, androidNotificationIconPath);
 
@@ -101,6 +117,12 @@ class NotificationManager {
       _clickStream = _clickStreamController!.stream;
     }
     return _clickStream!;
+  }
+
+  /// Exposes a way for tests to emit synthetic click events.
+  void emitTestClick(NotificationData data) {
+    getNotificationClickStream();
+    _clickStreamController?.add(data);
   }
 
   /// Gets the initial notification data
@@ -447,6 +469,10 @@ class NotificationManager {
     _inAppMessageManager.setNavigatorKey(navigatorKey);
   }
 
+  Future<void> setInAppDeliveryPolicy(InAppDeliveryPolicy policy) async {
+    await _inAppMessageManager.setDeliveryPolicy(policy);
+  }
+
   /// Provides stream of in-app messages triggered by data-only pushes
   Stream<InAppNotificationData> getInAppMessageStream({
     bool includePendingStorageItems = true,
@@ -465,6 +491,259 @@ class NotificationManager {
     await _inAppMessageManager.clearPendingInAppMessages(id: id);
   }
 
+  Future<void> setBackgroundProcessingCallback(
+      BackgroundMessageCallback? callback) async {
+    _backgroundMessageCallback = callback;
+    if (callback != null) {
+      await _replayQueuedBackgroundMessages();
+    }
+  }
+
+  void setDataOnlyMessageBridge(DataOnlyMessageBridge? bridge) {
+    _dataOnlyMessageBridge = bridge;
+  }
+
+  void enableDefaultDataOnlyBridge({
+    String? channelId,
+    String titleKey = 'title',
+    String bodyKey = 'body',
+  }) {
+    _dataOnlyMessageBridge = (RemoteMessage message) async {
+      final Map<String, dynamic> data = Map<String, dynamic>.from(message.data);
+      final String? title =
+          data[titleKey] as String? ?? message.notification?.title;
+      final String? body =
+          data[bodyKey] as String? ?? message.notification?.body;
+
+      if ((title == null || title.isEmpty) && (body == null || body.isEmpty)) {
+        return;
+      }
+
+      await _notificationService.showNotification(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: title ?? '',
+        body: body ?? '',
+        payload: data,
+        channelId: channelId ?? message.notification?.android?.channelId,
+      );
+    };
+  }
+
+  /// Registers a background message handler. The handler must be a top-level or
+  /// static function as required by Firebase Messaging.
+  Future<void> setBackgroundMessageHandler(
+      Future<void> Function(RemoteMessage message) handler) async {
+    try {
+      await _fcmService.setBackgroundMessageHandler(handler);
+      _backgroundHandlerRegistered = true;
+      _logMessage('[NotificationManager] Background handler registered');
+    } catch (error, stack) {
+      _logMessage(
+          '[NotificationManager] Register background handler error: $error');
+      _logMessage('[NotificationManager] Stack trace: $stack');
+    }
+  }
+
+  /// Internal handler to leverage plugin services during background delivery.
+  Future<void> handleBackgroundMessage(RemoteMessage message) async {
+    try {
+      await _storageService.saveNotification(message);
+      await _inAppMessageManager.handleRemoteMessage(message);
+      _analyticsService.trackNotificationReceived(message);
+      await _maybeBridgeDataOnlyMessage(message);
+
+      if (_backgroundMessageCallback != null) {
+        try {
+          final bool handled = await _backgroundMessageCallback!(message);
+          if (!handled) {
+            await _queueBackgroundMessage(message);
+          } else {
+            await _storageService.clearQueuedBackgroundMessages(
+                messageId: message.messageId);
+          }
+        } catch (error, stack) {
+          _logMessage(
+              '[NotificationManager] Background callback error: $error');
+          _logMessage('[NotificationManager] Stack trace: $stack');
+          await _queueBackgroundMessage(message);
+        }
+      }
+    } catch (error, stack) {
+      _logMessage(
+          '[NotificationManager] Handle background message error: $error');
+      _logMessage('[NotificationManager] Stack trace: $stack');
+    }
+  }
+
+  /// Runs a best-effort diagnostics sweep and returns actionable hints.
+  Future<NotificationDiagnosticsResult> runDiagnostics() async {
+    try {
+      final NotificationSettings settings =
+          await _fcmService.getNotificationSettings();
+      final bool permissionsGranted =
+          _isAuthorized(settings.authorizationStatus);
+
+      final String? storedToken = await _storageService.getFcmToken();
+      final bool tokenAvailable = storedToken != null && storedToken.isNotEmpty;
+
+      final bool badgeSupported = await _notificationService.isBadgeSupported();
+      final List<dynamic> pendingNotifications =
+          await _notificationService.getPendingNotifications();
+
+      final String webPermission =
+          await _notificationService.getWebNotificationPermissionStatus();
+      final bool webAllowed = webPermission == 'granted';
+
+      final Map<String, dynamic> deliveryDiagnostics =
+          _inAppMessageManager.getDeliveryDiagnostics(DateTime.now());
+      final int queuedBackgroundMessages =
+          (await _storageService.getQueuedBackgroundMessages()).length;
+
+      final List<String> recommendations = <String>[];
+
+      if (!permissionsGranted) {
+        recommendations.add(
+            'Prompt the user for notification permissions; current status: '
+            '${settings.authorizationStatus.name}.');
+      }
+
+      if (!tokenAvailable) {
+        recommendations.add(
+            'No stored FCM token found. Ensure init() completed and updateTokenCallback saved the token.');
+      }
+
+      if (!badgeSupported) {
+        recommendations.add(
+            'App icon badges are not supported on $currentPlatformName or the current launcher.');
+      }
+
+      if (isWeb && !webAllowed) {
+        recommendations.add(
+            'Browser notifications are currently "$webPermission". Trigger a permission prompt or guide the user to allow notifications.');
+      }
+
+      if (pendingNotifications.length > 16) {
+        recommendations.add(
+            'There are ${pendingNotifications.length} pending notifications queued locally. Consider pruning scheduled notifications.');
+      }
+
+      return NotificationDiagnosticsResult(
+        success: true,
+        permissionsGranted: permissionsGranted,
+        authorizationStatus: settings.authorizationStatus.name,
+        fcmTokenAvailable: tokenAvailable,
+        badgeSupported: badgeSupported,
+        webNotificationsAllowed: webAllowed,
+        pendingNotificationCount: pendingNotifications.length,
+        platform: currentPlatformName,
+        recommendations: recommendations,
+        metadata: {
+          'alertSetting': settings.alert.name,
+          'badgeSetting': settings.badge.name,
+          'soundSetting': settings.sound.name,
+          'showPreviews': settings.showPreviews.name,
+          'providesAppNotificationSettings':
+              settings.providesAppNotificationSettings.name,
+          'webPermission': webPermission,
+          'storedTokenPresent': tokenAvailable,
+          'deliveryPolicy': deliveryDiagnostics,
+          'queuedBackgroundMessages': queuedBackgroundMessages,
+          'dataBridgeEnabled': _dataOnlyMessageBridge != null,
+          'backgroundHandlerRegistered': _backgroundHandlerRegistered,
+        },
+      );
+    } catch (error, stack) {
+      _logMessage('[NotificationManager] Diagnostics error: $error');
+      _logMessage('[NotificationManager] Stack trace: $stack');
+      return NotificationDiagnosticsResult.failure(
+        platform: currentPlatformName,
+        error: error.toString(),
+      );
+    }
+  }
+
+  bool _isAuthorized(AuthorizationStatus status) =>
+      status == AuthorizationStatus.authorized ||
+      status == AuthorizationStatus.provisional;
+
+  Future<void> _maybeBridgeDataOnlyMessage(RemoteMessage message) async {
+    if (_dataOnlyMessageBridge == null) {
+      return;
+    }
+    if (message.notification != null) {
+      return;
+    }
+    try {
+      await _dataOnlyMessageBridge!(message);
+    } catch (error, stack) {
+      _logMessage('[NotificationManager] Data-only bridge error: $error');
+      _logMessage('[NotificationManager] Stack trace: $stack');
+    }
+  }
+
+  Future<void> _queueBackgroundMessage(RemoteMessage message) async {
+    try {
+      await _storageService.saveQueuedBackgroundMessage(
+        _serializeRemoteMessage(message),
+      );
+    } catch (error, stack) {
+      _logMessage('[NotificationManager] Queue background error: $error');
+      _logMessage('[NotificationManager] Stack trace: $stack');
+    }
+  }
+
+  Future<void> _replayQueuedBackgroundMessages() async {
+    if (_backgroundMessageCallback == null || _isReplayingBackgroundQueue) {
+      return;
+    }
+    _isReplayingBackgroundQueue = true;
+    try {
+      final List<Map<String, dynamic>> queued =
+          await _storageService.getQueuedBackgroundMessages();
+      if (queued.isEmpty) {
+        return;
+      }
+
+      for (final Map<String, dynamic> item in queued) {
+        try {
+          final RemoteMessage message = RemoteMessage.fromMap(item);
+          final bool handled = await _backgroundMessageCallback!(message);
+          if (handled) {
+            await _storageService.clearQueuedBackgroundMessages(
+                messageId: message.messageId);
+          }
+        } catch (error, stack) {
+          _logMessage('[NotificationManager] Replay background error: $error');
+          _logMessage('[NotificationManager] Stack trace: $stack');
+        }
+      }
+    } finally {
+      _isReplayingBackgroundQueue = false;
+    }
+  }
+
+  Map<String, dynamic> _serializeRemoteMessage(RemoteMessage message) {
+    final Map<String, dynamic> map = <String, dynamic>{
+      'messageId': message.messageId ??
+          'queued_${DateTime.now().millisecondsSinceEpoch}',
+      'data': message.data,
+      'sentTime': message.sentTime?.millisecondsSinceEpoch,
+      'category': message.category,
+      'collapseKey': message.collapseKey,
+      'senderId': message.senderId,
+      'ttl': message.ttl,
+      'notification': message.notification == null
+          ? null
+          : {
+              'title': message.notification?.title,
+              'body': message.notification?.body,
+            },
+    };
+
+    map.removeWhere((String key, dynamic value) => value == null);
+    return map;
+  }
+
   /// Disposes of resources
   Future<void> dispose() async {
     try {
@@ -473,6 +752,10 @@ class NotificationManager {
       await _notificationService.cancelAllNotifications();
       await _clickStreamController?.close();
       await _inAppMessageManager.dispose();
+      await _tokenRefreshSubscription?.cancel();
+      _backgroundHandlerRegistered = false;
+      _backgroundMessageCallback = null;
+      _dataOnlyMessageBridge = null;
       _logMessage('[NotificationManager] Disposed');
     } catch (error, stack) {
       _logMessage('[NotificationManager] Dispose error: $error');
@@ -483,51 +766,79 @@ class NotificationManager {
   Future<void> _handleFCMToken(String senderId,
       Future<bool> Function(String fcmToken)? updateTokenCallback) async {
     try {
-      final String? savedFcmToken = await _storageService.getFcmToken();
-      if (savedFcmToken == null && updateTokenCallback != null) {
-        final String? fcmToken = await _fcmService.getToken(vapidKey: senderId);
+      final String? currentToken =
+          await _fcmService.getToken(vapidKey: senderId);
 
-        if (fcmToken != null) {
-          _analyticsService.trackTokenEvent('fetched', fcmToken);
+      if (currentToken == null) {
+        _logMessage('[NotificationManager] Error fetching FCM Token!');
+        _analyticsService.trackTokenEvent('error', null);
+        return;
+      }
 
-          final bool updateSuccessful = await updateTokenCallback(fcmToken);
-          if (updateSuccessful) {
-            await _storageService.saveFcmToken(fcmToken);
-            _analyticsService.trackTokenEvent('updated', fcmToken);
-          }
-        } else {
-          _logMessage('[NotificationManager] Error fetching FCM Token!');
-          _analyticsService.trackTokenEvent('error', null);
+      final String? storedToken = await _storageService.getFcmToken();
+      if (storedToken == currentToken) {
+        _logMessage('[NotificationManager] FCM token unchanged');
+        return;
+      }
+
+      _analyticsService.trackTokenEvent(
+        storedToken == null ? 'fetched' : 'refreshed',
+        currentToken,
+      );
+
+      if (updateTokenCallback != null) {
+        final bool updateSuccessful = await updateTokenCallback(currentToken);
+        if (!updateSuccessful) {
+          _logMessage(
+              '[NotificationManager] updateTokenCallback returned false; token not persisted');
+          return;
         }
       }
+
+      await _storageService.saveFcmToken(currentToken);
+      _analyticsService.trackTokenEvent('updated', currentToken);
     } catch (error, stack) {
       _logMessage('[NotificationManager] Handle FCM token error: $error');
       _logMessage('[NotificationManager] Stack trace: $stack');
     }
   }
 
+  void _listenForTokenRefresh(
+      Future<bool> Function(String fcmToken) updateTokenCallback) {
+    _tokenRefreshSubscription?.cancel();
+    _tokenRefreshSubscription = _fcmService.onTokenRefresh.listen(
+      (String refreshedToken) async {
+        try {
+          _analyticsService.trackTokenEvent('refreshed', refreshedToken);
+          final bool updateSuccessful =
+              await updateTokenCallback(refreshedToken);
+          if (updateSuccessful) {
+            await _storageService.saveFcmToken(refreshedToken);
+            _analyticsService.trackTokenEvent('updated', refreshedToken);
+          } else {
+            _logMessage(
+                '[NotificationManager] Token refresh callback returned false; pending retry next refresh');
+          }
+        } catch (error, stack) {
+          _logMessage(
+              '[NotificationManager] Token refresh handling error: $error');
+          _logMessage('[NotificationManager] Stack trace: $stack');
+        }
+      },
+      onError: (Object error, StackTrace stack) {
+        _logMessage('[NotificationManager] Token refresh stream error: $error');
+        _logMessage('[NotificationManager] Stack trace: $stack');
+      },
+    );
+  }
+
   void _setupNotificationListeners(
       List<NotificationChannelData> androidChannels,
       String androidNotificationIconPath) {
-    if (!kIsWeb) {
-      if (Platform.isAndroid) {
-        _fcmService.onMessage.listen((RemoteMessage message) async {
-          await _handleForegroundMessage(
-              message, androidChannels, androidNotificationIconPath);
-        });
-      } else if (Platform.isIOS) {
-        _fcmService.onMessage.listen((RemoteMessage message) async {
-          await _handleForegroundMessage(
-              message, androidChannels, androidNotificationIconPath);
-        });
-      } else {
-        // Web platform
-        _fcmService.onMessage.listen((RemoteMessage message) async {
-          await _handleForegroundMessage(
-              message, androidChannels, androidNotificationIconPath);
-        });
-      }
-    }
+    _fcmService.onMessage.listen((RemoteMessage message) async {
+      await _handleForegroundMessage(
+          message, androidChannels, androidNotificationIconPath);
+    });
   }
 
   Future<void> _handleForegroundMessage(
@@ -544,6 +855,9 @@ class NotificationManager {
       final RemoteNotification? notification = message.notification;
 
       await _storageService.saveNotification(message);
+      if (notification == null) {
+        await _maybeBridgeDataOnlyMessage(message);
+      }
 
       if (!_foregroundOptions.enabled) {
         return;
@@ -553,10 +867,10 @@ class NotificationManager {
           !_foregroundShownNotifications.contains(notification.hashCode)) {
         _foregroundShownNotifications.add(notification.hashCode);
 
-        if (!kIsWeb && Platform.isAndroid) {
+        if (isAndroid) {
           await _showAndroidNotification(
               message, androidChannels, androidNotificationIconPath);
-        } else if (!kIsWeb && Platform.isIOS) {
+        } else if (isIOS) {
           await _showIOSNotification(message);
         } else {
           // Web platform
@@ -917,28 +1231,35 @@ class NotificationManager {
     List<NotificationAction>? actions,
   }) async {
     try {
-      // Calculate next occurrence
-      final now = DateTime.now();
-      DateTime scheduledDate =
-          DateTime(now.year, now.month, now.day, hour, minute);
+      final DateTime now = DateTime.now();
+      DateTime initial = DateTime(now.year, now.month, now.day, hour, minute);
 
-      // If time has passed today, schedule for tomorrow
-      if (scheduledDate.isBefore(now)) {
-        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      if (initial.isBefore(now)) {
+        initial = initial.add(const Duration(days: 1));
       }
 
-      await _notificationService.scheduleNotification(
+      final bool scheduled =
+          await _notificationService.scheduleRecurringNotification(
         id: id,
         title: title,
         body: body,
-        scheduledDate: scheduledDate,
+        repeatInterval: repeatInterval,
+        initialScheduleDate: initial,
         channelId: channelId,
         payload: payload,
         actions: actions,
       );
 
-      _logMessage(
-          '[NotificationManager] Recurring notification scheduled: $id');
+      if (scheduled) {
+        _analyticsService.trackNotificationScheduled('recurring', {
+          'notification_id': id,
+          'title': title,
+          'repeat_interval': repeatInterval.name,
+          'scheduled_start': initial.toIso8601String(),
+        });
+        _logMessage(
+            '[NotificationManager] Recurring notification scheduled: $id (${repeatInterval.name})');
+      }
     } catch (error, stack) {
       _logMessage(
           '[NotificationManager] Schedule recurring notification error: $error');

@@ -10,6 +10,13 @@ export 'src/models/export.dart';
 export 'src/core/export.dart';
 export 'src/in_app/export.dart';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingHandlerBackgroundDispatcher(
+    RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseMessagingHandler.handleBackgroundMessage(message);
+}
+
 /// A comprehensive Firebase Cloud Messaging handler for Flutter applications.
 ///
 /// This class provides a one-stop solution for all FCM operations including:
@@ -31,6 +38,10 @@ class FirebaseMessagingHandler {
 
   // Core manager for notification operations
   final NotificationManager _notificationManager = NotificationManager.instance;
+
+  static bool _testModeEnabled = false;
+  static StreamController<RemoteMessage>? _mockRemoteMessageController;
+  static StreamController<NotificationData>? _mockClickController;
 
   /// Initializes the Firebase Cloud Messaging handler with necessary configurations.
   ///
@@ -175,40 +186,67 @@ class FirebaseMessagingHandler {
 
   /// Enables test mode for mocking Firebase messaging in tests
   static void setTestMode(bool enabled) {
-    // Test mode functionality moved to core architecture
-    // Use NotificationManager for testing utilities
+    if (_testModeEnabled == enabled) {
+      return;
+    }
+
+    _testModeEnabled = enabled;
+
+    if (enabled) {
+      _mockRemoteMessageController =
+          StreamController<RemoteMessage>.broadcast();
+      _mockClickController = StreamController<NotificationData>.broadcast();
+    } else {
+      unawaited(_mockRemoteMessageController?.close());
+      unawaited(_mockClickController?.close());
+      _mockRemoteMessageController = null;
+      _mockClickController = null;
+    }
   }
 
   /// Gets mock notification stream for testing
   static Stream<RemoteMessage>? getMockNotificationStream() {
-    // Mock functionality moved to core architecture
-    // Use NotificationManager for testing utilities
-    return null;
+    return _mockRemoteMessageController?.stream;
   }
 
   /// Adds a mock notification to the test stream
   static void addMockNotification(RemoteMessage message) {
-    // Mock functionality moved to core architecture
-    // Use NotificationManager for testing utilities
+    if (!_testModeEnabled) {
+      throw StateError(
+          'Test mode is not enabled. Call setTestMode(true) before adding mock notifications.');
+    }
+
+    _mockRemoteMessageController?.add(message);
+    FirebaseMessagingHandler.instance._notificationManager
+        .processNotification(message);
   }
 
   /// Gets mock click stream for testing
   static Stream<NotificationData>? getMockClickStream() {
-    // Mock functionality moved to core architecture
-    // Use NotificationManager for testing utilities
-    return null;
+    return _mockClickController?.stream;
   }
 
   /// Adds a mock click event to the test stream
   static void addMockClickEvent(NotificationData data) {
-    // Mock functionality moved to core architecture
-    // Use NotificationManager for testing utilities
+    if (!_testModeEnabled) {
+      throw StateError(
+          'Test mode is not enabled. Call setTestMode(true) before adding mock click events.');
+    }
+    _mockClickController?.add(data);
+    FirebaseMessagingHandler.instance._notificationManager.emitTestClick(data);
   }
 
   /// Resets all mock data for clean test state
   static void resetMockData() {
-    // Mock functionality moved to core architecture
-    // Use NotificationManager for testing utilities
+    if (!_testModeEnabled) {
+      return;
+    }
+
+    unawaited(_mockRemoteMessageController?.close());
+    unawaited(_mockClickController?.close());
+
+    _mockRemoteMessageController = StreamController<RemoteMessage>.broadcast();
+    _mockClickController = StreamController<NotificationData>.broadcast();
   }
 
   /// Creates a mock RemoteMessage for testing
@@ -222,9 +260,31 @@ class FirebaseMessagingHandler {
     String? senderId,
     int? ttl,
   }) {
-    // Mock functionality moved to core architecture
-    // Use NotificationManager for testing utilities
-    throw UnimplementedError('Mock functionality moved to core architecture');
+    final Map<String, dynamic> map = {
+      'messageId':
+          messageId ?? 'mock_message_${DateTime.now().millisecondsSinceEpoch}',
+      'data': data ?? <String, dynamic>{},
+      'sentTime': DateTime.now().millisecondsSinceEpoch,
+      'category': category,
+      'collapseKey': collapseKey,
+      'senderId': senderId,
+      'ttl': ttl,
+      'notification': {
+        'title': title,
+        'body': body,
+      },
+    };
+
+    map.removeWhere((_, value) => value == null);
+    final Map<String, dynamic> notification =
+        map['notification'] as Map<String, dynamic>;
+    notification.removeWhere((_, value) => value == null);
+
+    if (notification.isEmpty) {
+      map.remove('notification');
+    }
+
+    return RemoteMessage.fromMap(map);
   }
 
   /// Creates a mock NotificationData for testing
@@ -239,9 +299,18 @@ class FirebaseMessagingHandler {
     String? category,
     List<NotificationAction>? actions,
   }) {
-    // Mock functionality moved to core architecture
-    // Use NotificationManager for testing utilities
-    throw UnimplementedError('Mock functionality moved to core architecture');
+    return NotificationData(
+      payload: payload ?? <String, dynamic>{},
+      title: title,
+      body: body,
+      imageUrl: imageUrl,
+      type: type,
+      isFromTerminated: isFromTerminated,
+      messageId: messageId,
+      category: category,
+      actions: actions,
+      timestamp: DateTime.now(),
+    );
   }
 
   /// Shows a local notification with interactive actions.
@@ -507,5 +576,57 @@ class FirebaseMessagingHandler {
   /// Configures the navigator key used for advanced in-app template presentation.
   void setInAppNavigatorKey(GlobalKey<NavigatorState> navigatorKey) {
     _notificationManager.setInAppNavigatorKey(navigatorKey);
+  }
+
+  /// Applies delivery throttling, quiet hours, and frequency caps for in-app templates.
+  Future<void> setInAppDeliveryPolicy(InAppDeliveryPolicy policy) async {
+    await _notificationManager.setInAppDeliveryPolicy(policy);
+  }
+
+  /// Registers a background message handler. The handler must be a top-level or
+  /// static function as required by Firebase Messaging.
+  Future<void> configureBackgroundMessageHandler(
+      Future<void> Function(RemoteMessage message) handler) async {
+    await _notificationManager.setBackgroundMessageHandler(handler);
+  }
+
+  /// Handles a background message using the plugin's internal pipeline. This can
+  /// be invoked from your top-level handler before executing custom logic.
+  static Future<void> handleBackgroundMessage(RemoteMessage message) async {
+    await NotificationManager.instance.handleBackgroundMessage(message);
+  }
+
+  /// Registers a background processing callback that runs after the handler
+  /// hydrates internal queues. Return `true` to mark the message handled, or
+  /// `false` to enqueue it for retry when the app resumes.
+  Future<void> configureBackgroundProcessingCallback(
+      Future<bool> Function(RemoteMessage message)? callback) async {
+    await _notificationManager.setBackgroundProcessingCallback(callback);
+  }
+
+  /// Sets a custom bridge for data-only messages (no notification payload).
+  void setDataOnlyMessageBridge(
+      Future<void> Function(RemoteMessage message)? bridge) {
+    _notificationManager.setDataOnlyMessageBridge(bridge);
+  }
+
+  /// Enables the built-in bridge that promotes data-only messages to local
+  /// notifications so users still see a banner.
+  void enableDefaultDataOnlyBridge({
+    String? channelId,
+    String titleKey = 'title',
+    String bodyKey = 'body',
+  }) {
+    _notificationManager.enableDefaultDataOnlyBridge(
+      channelId: channelId,
+      titleKey: titleKey,
+      bodyKey: bodyKey,
+    );
+  }
+
+  /// Generates a diagnostic snapshot summarizing permission status, token
+  /// availability, badge support, and other platform readiness checks.
+  Future<NotificationDiagnosticsResult> runDiagnostics() async {
+    return await _notificationManager.runDiagnostics();
   }
 }

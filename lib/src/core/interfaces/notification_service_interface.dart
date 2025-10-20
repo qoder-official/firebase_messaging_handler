@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../models/export.dart';
+import '../../enums/repeat_interval_enum.dart';
 
 /// Interface for local notification service operations
 abstract class NotificationServiceInterface {
@@ -45,6 +46,18 @@ abstract class NotificationServiceInterface {
     List<NotificationAction>? actions,
   });
 
+  /// Schedules a recurring notification
+  Future<bool> scheduleRecurringNotification({
+    required int id,
+    required String title,
+    required String body,
+    required RepeatIntervalEnum repeatInterval,
+    required DateTime initialScheduleDate,
+    Map<String, dynamic>? payload,
+    String? channelId,
+    List<NotificationAction>? actions,
+  });
+
   /// Cancels a notification
   Future<void> cancelNotification(int id);
 
@@ -59,4 +72,10 @@ abstract class NotificationServiceInterface {
 
   /// Gets notification app launch details
   Future<dynamic> getNotificationAppLaunchDetails();
+
+  /// Checks if the current platform supports application icon badges
+  Future<bool> isBadgeSupported();
+
+  /// Returns the current browser notification permission (web only)
+  Future<String> getWebNotificationPermissionStatus();
 }

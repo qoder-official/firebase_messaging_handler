@@ -1,3 +1,5 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 /// Interface for Firebase Cloud Messaging service operations
 abstract class FCMServiceInterface {
   /// Initializes the FCM service
@@ -29,6 +31,16 @@ abstract class FCMServiceInterface {
 
   /// Stream for background message handler
   Stream<dynamic> get onBackgroundMessage;
+
+  /// Stream for token refresh events
+  Stream<String> get onTokenRefresh;
+
+  /// Returns the current notification permission settings
+  Future<NotificationSettings> getNotificationSettings();
+
+  /// Registers the background message handler.
+  Future<void> setBackgroundMessageHandler(
+      Future<void> Function(RemoteMessage message) handler);
 
   /// Sets foreground notification presentation options
   Future<void> setForegroundNotificationPresentationOptions({

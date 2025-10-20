@@ -893,6 +893,7 @@ class _TemplateContent extends StatelessWidget {
     required this.config,
     required this.data,
     this.onAction,
+    // ignore: unused_element_parameter
     this.isCompact = false,
     this.page,
     required this.onDismiss,

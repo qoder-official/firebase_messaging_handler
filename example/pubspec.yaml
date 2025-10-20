@@ -15,10 +15,10 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Firebase Core (required for Firebase services)
-  firebase_core: ^3.10.0
+  firebase_core: ">=4.2.0"
   
   # Firebase Cloud Messaging
-  firebase_messaging: ^15.1.4
+  firebase_messaging: ">=16.0.0"
 
   # Firebase Messaging Handler Plugin (local development)
   firebase_messaging_handler:

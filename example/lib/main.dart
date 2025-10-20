@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 
@@ -12,8 +13,19 @@ import 'services/firebase_setup_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FirebaseMessagingHandler.instance.setInAppNavigatorKey(rootNavigatorKey);
+  await FirebaseMessagingHandler.instance.configureBackgroundMessageHandler(
+    exampleBackgroundHandler,
+  );
 
   runApp(const MyApp());
+}
+
+@pragma('vm:entry-point')
+Future<void> exampleBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseMessagingHandler.handleBackgroundMessage(message);
+  debugPrint('[BackgroundHandler] Message received: '
+      '${message.messageId} | data=${message.data}');
 }
 
 class MyApp extends StatelessWidget {
