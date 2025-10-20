@@ -481,7 +481,14 @@ class FirebaseMessagingHandlerNotificationService
         return null;
       }
 
-      _ensureInitialized();
+      // Do not hard require initialize() here so apps can call checkInitial()
+      // early during startup. Create a temporary plugin instance if needed.
+      if (_localNotifications == null) {
+        final FlutterLocalNotificationsPlugin temp =
+            FlutterLocalNotificationsPlugin();
+        return await temp.getNotificationAppLaunchDetails();
+      }
+
       return await _localNotifications!.getNotificationAppLaunchDetails();
     } catch (error, stack) {
       _logMessage('[NotificationService] Get launch details error: $error');
