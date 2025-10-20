@@ -116,7 +116,7 @@ class NotificationData {
               })
           .toList(),
       'timestamp': timestamp?.toIso8601String(),
-      'type': type.name,
+      'type': type.toString().split('.').last, // Get enum name safely
       'isFromTerminated': isFromTerminated,
       'messageId': messageId,
       'senderId': senderId,
@@ -153,7 +153,7 @@ class NotificationData {
       timestamp:
           map['timestamp'] != null ? DateTime.parse(map['timestamp']) : null,
       type: NotificationTypeEnum.values.firstWhere(
-        (type) => type.name == map['type'],
+        (type) => type.toString().split('.').last == map['type'],
         orElse: () => NotificationTypeEnum.foreground,
       ),
       isFromTerminated: map['isFromTerminated'] ?? false,

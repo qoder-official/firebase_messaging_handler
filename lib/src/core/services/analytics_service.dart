@@ -82,7 +82,10 @@ class AnalyticsService implements AnalyticsServiceInterface {
       final Map<String, dynamic> data = {
         'title': notificationData.title,
         'body': notificationData.body,
-        'type': notificationData.type.name,
+        'type': notificationData.type
+            .toString()
+            .split('.')
+            .last, // Get enum name safely
         'is_from_terminated': notificationData.isFromTerminated,
         'message_id': notificationData.messageId,
         'category': notificationData.category,
