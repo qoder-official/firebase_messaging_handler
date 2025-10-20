@@ -283,8 +283,6 @@ class FirebaseMessagingHandlerNotificationService
         tz.TZDateTime.from(scheduledDate, tz.local),
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         payload: jsonEncode(payload ?? {}),
       );
 
@@ -387,8 +385,6 @@ class FirebaseMessagingHandlerNotificationService
         normalizedDate,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         payload: jsonEncode(encodedPayload),
         matchDateTimeComponents: matchComponents,
       );
