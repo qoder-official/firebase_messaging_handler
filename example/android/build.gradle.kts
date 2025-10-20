@@ -17,18 +17,6 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
-    
-    // Set Java version for all subprojects
-    afterEvaluate {
-        if (project.hasProperty("android")) {
-            extensions.configure<com.android.build.gradle.BaseExtension>("android") {
-                compileOptions {
-                    sourceCompatibility = JavaVersion.VERSION_11
-                    targetCompatibility = JavaVersion.VERSION_11
-                }
-            }
-        }
-    }
 }
 
 tasks.register<Delete>("clean") {

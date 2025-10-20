@@ -34,8 +34,8 @@ dependencies:
   # HTML widget support for rich content
   flutter_widget_from_html_core: ">=0.15.0"
 
-  # Badge management for Android & iOS
-  flutter_app_badger: ">=1.5.0"
+  # Badge management for Android & iOS (using flutter_local_notifications)
+  # flutter_app_badger: ">=1.5.0"  # Removed due to namespace issues
 
 dev_dependencies:
   flutter_test:
