@@ -29,7 +29,8 @@ class NotificationManager {
 
   // Services
   final FCMService _fcmService = FCMService.instance;
-  final NotificationService _notificationService = NotificationService.instance;
+  final FirebaseMessagingHandlerNotificationService _notificationService =
+      FirebaseMessagingHandlerNotificationService.instance;
   final AnalyticsService _analyticsService = AnalyticsService.instance;
   final StorageService _storageService = StorageService.instance;
   final InAppMessageManager _inAppMessageManager = InAppMessageManager.instance;

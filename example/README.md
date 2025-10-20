@@ -103,7 +103,7 @@ Find your project's **Sender ID** in:
 
 ### **3. Update Configuration**
 
-Update the sender ID in `lib/services/notification_service.dart`:
+Update the sender ID in `lib/services/firebase_messaging_handler_example_service.dart`:
 ```dart
 senderId: 'YOUR_SENDER_ID', // Replace with your actual sender ID
 ```

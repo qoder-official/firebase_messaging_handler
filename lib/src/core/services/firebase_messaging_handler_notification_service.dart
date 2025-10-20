@@ -14,8 +14,7 @@ import '../utils/platform_utils.dart';
 import 'storage_service.dart';
 
 /// Local notification service implementation for Firebase Messaging Handler
-class FirebaseMessagingHandlerNotificationService
-    implements NotificationServiceInterface {
+class FirebaseMessagingHandlerNotificationService implements NotificationServiceInterface {
   static FirebaseMessagingHandlerNotificationService? _instance;
   FlutterLocalNotificationsPlugin? _localNotifications;
   bool _isInitialized = false;

@@ -23,8 +23,7 @@ class FirebaseMessagingHandlerExampleService {
   final GlobalKey<NavigatorState> _navigatorKey;
   final InAppMessageManager _inAppMessageManager = InAppMessageManager.instance;
 
-  FirebaseMessagingHandlerExampleService(
-      this._notificationProvider, this._navigatorKey);
+  FirebaseMessagingHandlerExampleService(this._notificationProvider, this._navigatorKey);
 
   Future<void> initialize() async {
     try {

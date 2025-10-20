@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/notification_provider.dart';
 import '../router/app_router.dart';
-import '../services/notification_service.dart' as example;
+import '../services/firebase_messaging_handler_example_service.dart' as example;
 import '../services/firebase_setup_service.dart';
 import '../widgets/notification_card.dart';
 import '../widgets/feature_card.dart';
@@ -173,7 +173,7 @@ const Map<String, String> _templateSamples = {
 };
 
 class _HomeScreenState extends State<HomeScreen> {
-  late example.NotificationService _notificationService;
+  late example.FirebaseMessagingHandlerExampleService _notificationService;
   bool _templatesRegistered = false;
   late TextEditingController _templateController;
   String _selectedTemplate = _templateSamples.keys.first;
@@ -183,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _notificationService = example.NotificationService(
+    _notificationService = example.FirebaseMessagingHandlerExampleService(
       Provider.of<NotificationProvider>(context, listen: false),
       rootNavigatorKey,
     );
