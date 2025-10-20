@@ -360,6 +360,7 @@ class FirebaseMessagingHandlerNotificationService
           body,
           periodicInterval,
           notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           payload: jsonEncode(encodedPayload),
         );
 
