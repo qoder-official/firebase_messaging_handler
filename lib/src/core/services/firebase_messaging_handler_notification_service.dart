@@ -14,7 +14,8 @@ import '../utils/platform_utils.dart';
 import 'storage_service.dart';
 
 /// Local notification service implementation for Firebase Messaging Handler
-class FirebaseMessagingHandlerNotificationService implements NotificationServiceInterface {
+class FirebaseMessagingHandlerNotificationService
+    implements NotificationServiceInterface {
   static FirebaseMessagingHandlerNotificationService? _instance;
   FlutterLocalNotificationsPlugin? _localNotifications;
   bool _isInitialized = false;
@@ -514,9 +515,12 @@ class FirebaseMessagingHandlerNotificationService implements NotificationService
 
     try {
       if (js.context.hasProperty('Notification')) {
-        final dynamic permission = js.context['Notification']['permission'];
-        if (permission is String) {
-          return permission;
+        final dynamic notification = js.context['Notification'];
+        if (notification != null && notification.hasProperty('permission')) {
+          final dynamic permission = notification['permission'];
+          if (permission is String) {
+            return permission;
+          }
         }
       }
       return 'unknown';
