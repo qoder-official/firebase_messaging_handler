@@ -75,7 +75,7 @@ class FirebaseMessagingHandlerExampleService {
 
       // Handle initial notification separately (recommended approach)
       final NotificationData? initialData =
-          await _messagingHandler.checkInitial();
+          await FirebaseMessagingHandler.checkInitial();
       if (initialData != null) {
         _notificationProvider.setInitialNotification(initialData);
         _handleNotificationClick(initialData, isInitial: true);

@@ -482,10 +482,20 @@ class FirebaseMessagingHandlerNotificationService
       }
 
       // Do not hard require initialize() here so apps can call checkInitial()
-      // early during startup. Create a temporary plugin instance if needed.
+      // early during startup. On Android, the plugin must be initialized once
+      // to capture the launch intent; do a minimal, safe initialization.
       if (_localNotifications == null) {
         final FlutterLocalNotificationsPlugin temp =
             FlutterLocalNotificationsPlugin();
+        try {
+          final InitializationSettings init = InitializationSettings(
+            android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
+            iOS: const DarwinInitializationSettings(),
+          );
+          await temp.initialize(init);
+        } catch (_) {
+          // Best-effort; still attempt to read launch details
+        }
         return await temp.getNotificationAppLaunchDetails();
       }
 

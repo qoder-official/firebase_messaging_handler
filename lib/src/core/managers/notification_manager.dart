@@ -135,12 +135,17 @@ class NotificationManager {
     _clickStreamController?.add(data);
   }
 
-  /// Gets the initial notification data
+  /// Gets the initial notification data (instance wrapper)
   Future<NotificationData?> getInitialNotificationData() async {
+    return await NotificationManager.getInitialNotificationDataStatic();
+  }
+
+  /// Gets the initial notification data (static, safe to call early)
+  static Future<NotificationData?> getInitialNotificationDataStatic() async {
     try {
       // Check Firebase Messaging initial message
       final RemoteMessage? firebaseInitialMessage =
-          await _fcmService.getInitialMessage();
+          await FCMService.instance.getInitialMessage();
       if (firebaseInitialMessage?.data != null) {
         return NotificationData(
           payload: firebaseInitialMessage!.data,
@@ -155,7 +160,8 @@ class NotificationManager {
 
       // Check flutter_local_notifications initial message
       final NotificationAppLaunchDetails? launchDetails =
-          await _notificationService.getNotificationAppLaunchDetails();
+          await FirebaseMessagingHandlerNotificationService.instance
+              .getNotificationAppLaunchDetails();
 
       if (launchDetails?.didNotificationLaunchApp ?? false) {
         final payload = launchDetails?.notificationResponse?.payload != null
@@ -172,9 +178,10 @@ class NotificationManager {
 
       return null;
     } catch (error, stack) {
-      _logMessage(
+      NotificationManager.instance._logMessage(
           '[NotificationManager] Get initial notification error: $error');
-      _logMessage('[NotificationManager] Stack trace: $stack');
+      NotificationManager.instance
+          ._logMessage('[NotificationManager] Stack trace: $stack');
       return null;
     }
   }
