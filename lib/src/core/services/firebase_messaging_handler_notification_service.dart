@@ -6,6 +6,8 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:universal_html/js.dart' as js;
 import '../interfaces/notification_service_interface.dart';
+import '../managers/notification_manager.dart';
+import '../../enums/export.dart';
 import '../../constants/firebase_messaging_handler_constants.dart';
 import '../../enums/repeat_interval_enum.dart';
 import '../../models/export.dart';
@@ -853,6 +855,29 @@ class FirebaseMessagingHandlerNotificationService
           NotificationResponseType.selectedNotification) {
         _logMessage(
             '[NotificationService] Notification response received: ${response.id}');
+
+        // Forward to click stream so foreground taps are published consistently
+        final String? rawPayload = response.payload;
+        Map<String, dynamic> payload = <String, dynamic>{};
+        if (rawPayload != null && rawPayload.isNotEmpty) {
+          try {
+            final dynamic decoded = jsonDecode(rawPayload);
+            if (decoded is Map<String, dynamic>) {
+              payload = decoded;
+            }
+          } catch (_) {
+            // Ignore malformed payloads; keep empty map
+          }
+        }
+
+        NotificationManager.instance.emitTestClick(
+          NotificationData(
+            payload: payload,
+            // Foreground tap on a local notification we presented
+            type: NotificationTypeEnum.foreground,
+            isFromTerminated: false,
+          ),
+        );
       }
     } catch (error, stack) {
       _logMessage('[NotificationService] Notification response error: $error');
