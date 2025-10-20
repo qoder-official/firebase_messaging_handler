@@ -74,6 +74,15 @@ class NotificationManager {
         return null;
       }
 
+      // Configure iOS foreground notification presentation options
+      // This prevents iOS from automatically showing notifications when app is in foreground
+      // We handle them manually via our custom notification system
+      await _fcmService.setForegroundNotificationPresentationOptions(
+        alert: false, // Disable automatic alerts
+        badge: true, // Keep badge updates
+        sound: false, // Disable automatic sounds (we handle custom sounds)
+      );
+
       // Handle FCM token
       await _handleFCMToken(senderId, updateTokenCallback);
 
