@@ -75,7 +75,17 @@ class FirebaseMessagingHandler {
   /// This is useful when you want to handle initial notifications separately from the stream.
   /// Returns null if the app was not launched from a notification.
   static Future<NotificationData?> checkInitial() async {
-    return await NotificationManager.getInitialNotificationDataStatic();
+    // Try immediately first
+    var result = await NotificationManager.getInitialNotificationDataStatic();
+    if (result != null) {
+      return result;
+    }
+
+    // If not found immediately, wait a bit and try again (iOS timing issue)
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    result = await NotificationManager.getInitialNotificationDataStatic();
+    return result;
   }
 
   /// Disposes of the notification handler resources.

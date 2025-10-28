@@ -10,6 +10,10 @@ class FCMService implements FCMServiceInterface {
   FirebaseMessaging? _firebaseMessaging;
   bool _isInitialized = false;
 
+  // Cache for initial message (can only be called once per app launch)
+  RemoteMessage? _cachedInitialMessage;
+  bool _hasCheckedInitialMessage = false;
+
   /// Singleton instance
   static FCMService get instance {
     _instance ??= FCMService._internal();
@@ -140,6 +144,11 @@ class FCMService implements FCMServiceInterface {
   @override
   Future<RemoteMessage?> getInitialMessage() async {
     try {
+      // Return cached message if we've already checked
+      if (_hasCheckedInitialMessage) {
+        return _cachedInitialMessage;
+      }
+
       // Ensure Firebase Messaging is initialized
       if (!_isInitialized) {
         await initialize();
@@ -147,6 +156,29 @@ class FCMService implements FCMServiceInterface {
 
       final RemoteMessage? message =
           await _firebaseMessaging!.getInitialMessage();
+
+      // Cache the result (even if null)
+      _cachedInitialMessage = message;
+      _hasCheckedInitialMessage = true;
+
+      // If no message found and we're on iOS, try a different approach
+      if (message == null && isIOS) {
+        // Sometimes on iOS, we need to check if Firebase is properly initialized
+        try {
+          // Force a small delay and try again (iOS timing issue)
+          await Future.delayed(const Duration(milliseconds: 100));
+          final RemoteMessage? retryMessage =
+              await _firebaseMessaging!.getInitialMessage();
+          if (retryMessage != null) {
+            // Update cache with retry result
+            _cachedInitialMessage = retryMessage;
+            return retryMessage;
+          }
+        } catch (retryError) {
+          // iOS retry failed, continue with null result
+        }
+      }
+
       _logMessage(
           '[FCMService] Initial message: ${message != null ? 'found' : 'none'}');
       return message;
@@ -155,6 +187,12 @@ class FCMService implements FCMServiceInterface {
       _logMessage('[FCMService] Stack trace: $stack');
       return null;
     }
+  }
+
+  /// Clears the cached initial message (useful for testing)
+  void clearInitialMessageCache() {
+    _cachedInitialMessage = null;
+    _hasCheckedInitialMessage = false;
   }
 
   @override

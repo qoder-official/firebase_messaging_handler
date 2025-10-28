@@ -146,6 +146,7 @@ class NotificationManager {
       // Check Firebase Messaging initial message
       final RemoteMessage? firebaseInitialMessage =
           await FCMService.instance.getInitialMessage();
+
       if (firebaseInitialMessage?.data != null) {
         return NotificationData(
           payload: firebaseInitialMessage!.data,
