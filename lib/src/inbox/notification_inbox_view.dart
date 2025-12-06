@@ -140,7 +140,7 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
   Widget build(BuildContext context) {
     final NotificationInboxTheme? theme = widget.theme;
     final Color? bg = theme?.backgroundColor;
-    final Color? divider = theme?.dividerColor ?? Colors.grey.shade200;
+    final Color divider = theme?.dividerColor ?? Colors.grey.shade200;
 
     final Widget child = _isLoading
         ? const Center(child: CircularProgressIndicator())

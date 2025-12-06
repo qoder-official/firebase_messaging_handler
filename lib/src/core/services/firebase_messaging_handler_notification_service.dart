@@ -286,6 +286,8 @@ class FirebaseMessagingHandlerNotificationService
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         payload: jsonEncode(payload ?? {}),
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
 
       _logMessage(
@@ -389,6 +391,8 @@ class FirebaseMessagingHandlerNotificationService
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         payload: jsonEncode(encodedPayload),
         matchDateTimeComponents: matchComponents,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
 
       _logMessage(

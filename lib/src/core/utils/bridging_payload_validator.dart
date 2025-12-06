@@ -8,16 +8,15 @@ class BridgingPayloadValidator {
     Map<String, dynamic> data, {
     void Function(String reason)? onError,
   }) {
-    String? _asString(dynamic value) =>
-        value == null ? null : value.toString().trim();
+    String? asString(dynamic value) => value?.toString().trim();
 
     bool fail(String reason) {
       onError?.call(reason);
       return false;
     }
 
-    final String? title = _asString(data['title']);
-    final String? body = _asString(data['body']);
+    final String? title = asString(data['title']);
+    final String? body = asString(data['body']);
 
     if ((title == null || title.isEmpty) && (body == null || body.isEmpty)) {
       return fail('missing "title" or "body" for data-only bridge');
@@ -54,8 +53,8 @@ class BridgingPayloadValidator {
         if (item is! Map) {
           return fail('each action must be an object with "id" and "title"');
         }
-        final String? actionId = _asString(item['id']);
-        final String? actionTitle = _asString(item['title']);
+        final String? actionId = asString(item['id']);
+        final String? actionTitle = asString(item['title']);
         if (actionId == null || actionId.isEmpty || actionTitle == null) {
           return fail('action is missing "id" or "title"');
         }

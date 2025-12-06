@@ -1,3 +1,14 @@
+## 1.0.0-beta.1
+- Beta preview of the FCM superpack:
+  - Auto initial-notification emission onto the unified click stream (opt-out available).
+  - Unified handler (FG/BG/terminated) with normalized payloads.
+  - Inbox storage + inbox widget (theming, swipe-to-delete, paging) wired in example.
+  - Data-only bridge, payload validator, and diagnostics improvements.
+  - Expanded README onboarding and pubspec topics for discoverability.
+  - New tests (validator, inbox storage, click queue, goldens) and alchemist harness.
+
+## 0.1.0
+- Initial release on pub.dev.
 ## Unreleased
 
 - Added `InAppOverlayHost`/`InAppOverlayController` for plugin-managed overlays.
