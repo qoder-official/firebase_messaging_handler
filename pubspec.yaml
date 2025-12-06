@@ -47,13 +47,8 @@ topics:
   - fcm
   - firebase-messaging
   - push-notifications
-  - local-notifications
   - unified-handler
   - in-app-messaging
-  - notification-inbox
-  - background
-  - web-push
-  - flutter
 
 # Platform-specific configuration
 flutter:
