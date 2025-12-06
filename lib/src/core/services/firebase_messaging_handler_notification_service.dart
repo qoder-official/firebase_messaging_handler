@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:universal_html/js.dart' as js;
+import '../utils/js_compat.dart' as js_compat;
 import '../interfaces/notification_service_interface.dart';
 import '../managers/notification_manager.dart';
 import '../../enums/export.dart';
@@ -576,7 +577,7 @@ class FirebaseMessagingHandlerNotificationService
 
         notificationInstance.callMethod('addEventListener', [
           'click',
-          js.allowInterop((event) {
+          js_compat.allowInterop((event) {
             _handleWebNotificationClick(data);
           }),
         ]);

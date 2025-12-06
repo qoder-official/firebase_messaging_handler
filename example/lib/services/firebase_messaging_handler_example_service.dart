@@ -74,13 +74,9 @@ class FirebaseMessagingHandlerExampleService {
         },
       );
 
-      // Handle initial notification separately (recommended approach)
-      final NotificationData? initialData =
-          await FirebaseMessagingHandler.checkInitial();
-      if (initialData != null) {
-        _notificationProvider.setInitialNotification(initialData);
-        _handleNotificationClick(initialData, isInitial: true);
-      }
+      await _messagingHandler.setUnifiedMessageHandler(
+        _handleUnifiedMessage,
+      );
 
       // Listen to notification clicks
       clickStream?.listen((NotificationData? data) {
@@ -125,6 +121,41 @@ class FirebaseMessagingHandlerExampleService {
       _notificationProvider.setInitialized(false);
       _notificationProvider.addActivity('Initialization error: $e');
     }
+  }
+
+  Future<bool> _handleUnifiedMessage(
+    NormalizedMessage message,
+    NotificationLifecycle lifecycle,
+  ) async {
+    _notificationProvider.addActivity(
+      'Unified (${lifecycle.name}): ${message.title ?? message.id}',
+    );
+
+    // Avoid UI work when running in background isolate
+    if (lifecycle == NotificationLifecycle.background) {
+      return true;
+    }
+
+    if (_navigatorKey.currentState != null) {
+      _navigatorKey.currentState!.push(
+        MaterialPageRoute(
+          builder: (_) => ScenarioScreen(
+            notification: NotificationData(
+              title: message.title,
+              body: message.body,
+              payload: message.data,
+              timestamp: message.receivedAt,
+              type: lifecycle == NotificationLifecycle.terminated
+                  ? NotificationTypeEnum.terminated
+                  : NotificationTypeEnum.background,
+              messageId: message.id,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return true;
   }
 
   void _handleNotificationClick(

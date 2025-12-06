@@ -13,4 +13,6 @@ class FirebaseMessagingHandlerConstants {
       'firebase_messaging_handler_in_app_delivery_history_pref_key';
   static const String backgroundMessageQueuePrefKey =
       'firebase_messaging_handler_background_queue_pref_key';
+  static const String inboxItemsPrefKey =
+      'firebase_messaging_handler_inbox_items_pref_key';
 }

@@ -21,7 +21,8 @@ class InAppMessageManager {
   InAppMessageManager._internal();
 
   final StorageService _storageService = StorageService.instance;
-  final AnalyticsService _analyticsService = AnalyticsService.instance;
+  // Use the shared analytics singleton for in-app events.
+  final FmhAnalyticsService _analyticsService = FmhAnalyticsService.instance;
   InAppDeliveryPolicy _deliveryPolicy = const InAppDeliveryPolicy();
   final Map<String, InAppDeliveryStats> _deliveryStats =
       <String, InAppDeliveryStats>{};

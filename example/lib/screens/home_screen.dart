@@ -8,6 +8,7 @@ import '../providers/notification_provider.dart';
 import '../router/app_router.dart';
 import '../services/firebase_messaging_handler_example_service.dart' as example;
 import '../services/firebase_setup_service.dart';
+import 'inbox_screen.dart';
 import '../widgets/notification_card.dart';
 import '../widgets/feature_card.dart';
 
@@ -487,6 +488,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         body:
                             'Invokes enableDefaultDataOnlyBridge and simulates a background data payload. The handler '
                             'promotes it into a local notification so users still see a banner.',
+                      ),
+                    ),
+                    FeatureCard(
+                      title: 'Inbox Widget Demo',
+                      description:
+                          'Opens a storage-backed inbox with swipe-to-delete and theming.',
+                      icon: Icons.inbox_outlined,
+                      color: Colors.deepPurple,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const InboxScreen(),
+                          ),
+                        );
+                      },
+                      onInfoTap: () => _showFeatureInfo(
+                        context,
+                        title: 'Inbox Widget Demo',
+                        body:
+                            'Shows NotificationInboxView backed by InboxStorageService with mark-as-read, delete, and theming knobs.',
                       ),
                     ),
                     FeatureCard(

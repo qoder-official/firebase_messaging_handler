@@ -59,38 +59,55 @@ class FCMService implements FCMServiceInterface {
 
   @override
   Future<String?> getToken({String? vapidKey}) async {
-    try {
-      // Ensure Firebase Messaging is initialized
-      if (!_isInitialized) {
-        await initialize();
+    int retryCount = 0;
+    const int maxRetries = 3;
+
+    while (retryCount <= maxRetries) {
+      try {
+        // Ensure Firebase Messaging is initialized
+        if (!_isInitialized) {
+          await initialize();
+        }
+
+        final String? token =
+            await _firebaseMessaging!.getToken(vapidKey: vapidKey);
+
+        // Handle APNs token error on iOS simulators
+        if (token == null && isIOS) {
+          _logMessage(
+              '[FCMService] APNs token not available (normal on iOS simulators)');
+          return 'mock_fcm_token_simulator_${DateTime.now().millisecondsSinceEpoch}';
+        }
+
+        if (token != null) {
+          _logMessage(
+              '[FCMService] FCM token retrieved: success');
+          return token;
+        }
+      } catch (error, stack) {
+        _logMessage('[FCMService] Token retrieval attempt ${retryCount + 1} failed: $error');
+        
+        // Handle APNs token error specifically - no point retrying this immediately if config is wrong
+        if (isIOS && error.toString().contains('apns-token-not-set')) {
+           _logMessage(
+              '[FCMService] APNs token not set - this is normal on iOS simulators or when APNs is not configured');
+          return 'mock_fcm_token_apns_not_set_${DateTime.now().millisecondsSinceEpoch}';
+        }
+
+        if (retryCount == maxRetries) {
+          _logMessage('[FCMService] Token retrieval failed after $maxRetries retries.');
+          _logMessage('[FCMService] Stack trace: $stack');
+          return null;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        final int delaySeconds = 1 << retryCount;
+        _logMessage('[FCMService] Retrying token retrieval in ${delaySeconds}s...');
+        await Future.delayed(Duration(seconds: delaySeconds));
+        retryCount++;
       }
-
-      final String? token =
-          await _firebaseMessaging!.getToken(vapidKey: vapidKey);
-
-      // Handle APNs token error on iOS simulators
-      if (token == null && isIOS) {
-        _logMessage(
-            '[FCMService] APNs token not available (normal on iOS simulators)');
-        return 'mock_fcm_token_simulator_${DateTime.now().millisecondsSinceEpoch}';
-      }
-
-      _logMessage(
-          '[FCMService] FCM token retrieved: ${token != null ? 'success' : 'null'}');
-      return token;
-    } catch (error, stack) {
-      _logMessage('[FCMService] Token retrieval error: $error');
-      _logMessage('[FCMService] Stack trace: $stack');
-
-      // Handle APNs token error specifically
-      if (isIOS && error.toString().contains('apns-token-not-set')) {
-        _logMessage(
-            '[FCMService] APNs token not set - this is normal on iOS simulators or when APNs is not configured');
-        return 'mock_fcm_token_apns_not_set_${DateTime.now().millisecondsSinceEpoch}';
-      }
-
-      return null;
     }
+    return null;
   }
 
   @override

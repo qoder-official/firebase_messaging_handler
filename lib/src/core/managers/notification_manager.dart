@@ -7,13 +7,19 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../services/export.dart';
 import 'in_app_message_manager.dart';
 import '../../models/export.dart';
+import '../../models/normalized_message.dart';
 import '../../enums/export.dart';
-import '../../extensions/export.dart';
+import '../../enums/notification_lifecycle_enum.dart';
 import '../utils/platform_utils.dart';
+import 'badge_manager.dart';
+import '../utils/bridging_payload_validator.dart';
+import '../interfaces/notification_inbox_storage_interface.dart';
 
 typedef BackgroundMessageCallback = Future<bool> Function(
     RemoteMessage message);
 typedef DataOnlyMessageBridge = Future<void> Function(RemoteMessage message);
+typedef UnifiedMessageHandler = Future<bool> Function(
+    NormalizedMessage message, NotificationLifecycle lifecycle);
 
 /// Manager class for handling notification lifecycle and operations
 class NotificationManager {
@@ -31,11 +37,17 @@ class NotificationManager {
   final FCMService _fcmService = FCMService.instance;
   final FirebaseMessagingHandlerNotificationService _notificationService =
       FirebaseMessagingHandlerNotificationService.instance;
-  final AnalyticsService _analyticsService = AnalyticsService.instance;
+  final FmhAnalyticsService _analyticsService = FmhAnalyticsService.instance;
   final StorageService _storageService = StorageService.instance;
+  final NotificationInboxStorageInterface _inboxStorage =
+      InboxStorageService();
+
   final InAppMessageManager _inAppMessageManager = InAppMessageManager.instance;
+  final BadgeManager _badgeManager = BadgeManager.instance;
   ForegroundNotificationOptions _foregroundOptions =
       ForegroundNotificationOptions.defaults;
+  UnifiedMessageHandler? _unifiedMessageHandler;
+  int _invalidPayloadCount = 0;
   StreamSubscription<String>? _tokenRefreshSubscription;
   bool _backgroundHandlerRegistered = false;
   BackgroundMessageCallback? _backgroundMessageCallback;
@@ -45,10 +57,12 @@ class NotificationManager {
   // Stream controllers
   StreamController<NotificationData?>? _clickStreamController;
   Stream<NotificationData?>? _clickStream;
+  final List<NotificationData?> _pendingClickEvents = <NotificationData?>[];
 
   // State management
   final Set<int> _openedNotifications = {};
   final Set<int> _foregroundShownNotifications = {};
+  final Set<String> _persistedInboxIds = <String>{};
   bool _hasFetchedInitialNotification = false;
 
   /// Initializes the notification manager
@@ -57,13 +71,36 @@ class NotificationManager {
     required List<NotificationChannelData> androidChannels,
     required String androidNotificationIconPath,
     Future<bool> Function(String fcmToken)? updateTokenCallback,
-    bool includeInitialNotificationInStream = false,
+    bool includeInitialNotificationInStream = true,
   }) async {
     try {
       // Initialize services
       await _fcmService.initialize();
+
+      // [Smart Default Channel]
+      // Ensure at least one high-importance channel exists to prevent "silent" notification issues on Android.
+      final List<NotificationChannelData> effectiveChannels =
+          List.from(androidChannels);
+      final bool hasHighImportanceChannel = effectiveChannels.any((channel) =>
+          channel.importance == NotificationImportanceEnum.high ||
+          channel.importance == NotificationImportanceEnum.max);
+
+      if (!hasHighImportanceChannel) {
+        _logMessage(
+            '[NotificationManager] 💡 No High-Importance channel found. Auto-creating "default_channel" to ensure heads-up notifications work.');
+        effectiveChannels.add(NotificationChannelData(
+          id: 'default_channel',
+          name: 'Default Notifications',
+          description: 'Standard high-importance notifications',
+          importance: NotificationImportanceEnum.high,
+          priority: NotificationPriorityEnum.high,
+          playSound: true,
+          enableVibration: true,
+        ));
+      }
+
       await _notificationService.initialize(
-        androidChannels: androidChannels,
+        androidChannels: effectiveChannels,
         androidIconPath: androidNotificationIconPath,
       );
 
@@ -123,7 +160,18 @@ class NotificationManager {
   /// Gets the notification click stream
   Stream<NotificationData?> getNotificationClickStream() {
     if (_clickStreamController == null || _clickStream == null) {
-      _clickStreamController = StreamController<NotificationData?>.broadcast();
+      _clickStreamController = StreamController<NotificationData?>.broadcast(
+        onListen: () {
+          if (_pendingClickEvents.isEmpty) {
+            return;
+          }
+          for (final NotificationData? event in List<NotificationData?>.from(
+              _pendingClickEvents)) {
+            _clickStreamController?.add(event);
+          }
+          _pendingClickEvents.clear();
+        },
+      );
       _clickStream = _clickStreamController!.stream;
     }
     return _clickStream!;
@@ -132,7 +180,7 @@ class NotificationManager {
   /// Exposes a way for tests to emit synthetic click events.
   void emitTestClick(NotificationData data) {
     getNotificationClickStream();
-    _clickStreamController?.add(data);
+    _emitOrQueueClick(data);
   }
 
   /// Gets the initial notification data (instance wrapper)
@@ -188,8 +236,9 @@ class NotificationManager {
   }
 
   /// Processes a notification
-  void processNotification(RemoteMessage message,
-      {bool isFromTerminated = false}) {
+  Future<void> processNotification(RemoteMessage message,
+      {bool isFromTerminated = false,
+      bool emitToClickStream = true}) async {
     try {
       if (!_openedNotifications.contains(message.messageId.hashCode)) {
         _openedNotifications.add(message.messageId.hashCode);
@@ -204,27 +253,29 @@ class NotificationManager {
         // Track notification received
         _analyticsService.trackNotificationReceived(message);
 
+        final NotificationLifecycle lifecycle = isFromTerminated
+            ? NotificationLifecycle.terminated
+            : NotificationLifecycle.resume;
+
+        unawaited(_persistInboxEntry(message, lifecycle));
+
+        // Unified handler (resume/terminated)
+        unawaited(_invokeUnifiedHandler(message, lifecycle));
+
         // Add to click stream
-        _addNotificationClickStreamEvent(
-          message.data,
-          message: message,
-          isFromTerminated: isFromTerminated,
-          type: isFromTerminated
-              ? NotificationTypeEnum.terminated
-              : NotificationTypeEnum.background,
-        );
+        if (emitToClickStream) {
+          _addNotificationClickStreamEvent(
+            message.data,
+            message: message,
+            isFromTerminated: isFromTerminated,
+            type: isFromTerminated
+                ? NotificationTypeEnum.terminated
+                : NotificationTypeEnum.background,
+          );
+        }
 
         // Track notification clicked
-        _analyticsService.trackNotificationClicked(NotificationData(
-          payload: message.data,
-          title: message.notification?.title,
-          body: message.notification?.body,
-          type: isFromTerminated
-              ? NotificationTypeEnum.terminated
-              : NotificationTypeEnum.background,
-          isFromTerminated: isFromTerminated,
-          messageId: message.messageId,
-        ));
+        _analyticsService.trackNotificationClicked(message);
       }
     } catch (error, stack) {
       _logMessage('[NotificationManager] Process notification error: $error');
@@ -286,7 +337,7 @@ class NotificationManager {
       );
 
       if (result) {
-        _analyticsService.trackNotificationScheduled('one_time', {
+        _analyticsService.trackEvent('notification_scheduled_one_time', {
           'notification_id': id,
           'title': title,
           'scheduled_for': scheduledDate.toIso8601String(),
@@ -345,56 +396,27 @@ class NotificationManager {
 
   /// Sets badge count for iOS
   Future<void> setIOSBadgeCount(int count) async {
-    try {
-      await _notificationService.setIOSBadgeCount(count);
-    } catch (error, stack) {
-      _logMessage('[NotificationManager] Set iOS badge count error: $error');
-      _logMessage('[NotificationManager] Stack trace: $stack');
-    }
+    await _badgeManager.setBadgeCount(count);
   }
 
   /// Gets iOS badge count
   Future<int?> getIOSBadgeCount() async {
-    try {
-      return await _notificationService.getIOSBadgeCount();
-    } catch (error, stack) {
-      _logMessage('[NotificationManager] Get iOS badge count error: $error');
-      _logMessage('[NotificationManager] Stack trace: $stack');
-      return null;
-    }
+    return await _badgeManager.getBadgeCount();
   }
 
   /// Sets badge count for Android
   Future<void> setAndroidBadgeCount(int count) async {
-    try {
-      await _notificationService.setAndroidBadgeCount(count);
-    } catch (error, stack) {
-      _logMessage(
-          '[NotificationManager] Set Android badge count error: $error');
-      _logMessage('[NotificationManager] Stack trace: $stack');
-    }
+    await _badgeManager.setBadgeCount(count);
   }
 
   /// Gets Android badge count
   Future<int?> getAndroidBadgeCount() async {
-    try {
-      return await _notificationService.getAndroidBadgeCount();
-    } catch (error, stack) {
-      _logMessage(
-          '[NotificationManager] Get Android badge count error: $error');
-      _logMessage('[NotificationManager] Stack trace: $stack');
-      return null;
-    }
+    return await _badgeManager.getBadgeCount();
   }
 
   /// Clears badge count
   Future<void> clearBadgeCount() async {
-    try {
-      await _notificationService.clearBadgeCount();
-    } catch (error, stack) {
-      _logMessage('[NotificationManager] Clear badge count error: $error');
-      _logMessage('[NotificationManager] Stack trace: $stack');
-    }
+    await _badgeManager.removeBadge();
   }
 
   /// Subscribes to a topic
@@ -521,6 +543,14 @@ class NotificationManager {
     _dataOnlyMessageBridge = bridge;
   }
 
+  Future<void> setUnifiedMessageHandler(
+      UnifiedMessageHandler? handler) async {
+    _unifiedMessageHandler = handler;
+    if (handler != null) {
+      await _replayQueuedBackgroundMessages();
+    }
+  }
+
   void enableDefaultDataOnlyBridge({
     String? channelId,
     String titleKey = 'title',
@@ -552,7 +582,11 @@ class NotificationManager {
   Future<void> setBackgroundMessageHandler(
       Future<void> Function(RemoteMessage message) handler) async {
     try {
-      await _fcmService.setBackgroundMessageHandler(handler);
+      // Wrap the user handler so the plugin pipeline always hydrates first.
+      await _fcmService.setBackgroundMessageHandler((RemoteMessage message) async {
+        await handleBackgroundMessage(message);
+        await handler(message);
+      });
       _backgroundHandlerRegistered = true;
       _logMessage('[NotificationManager] Background handler registered');
     } catch (error, stack) {
@@ -566,25 +600,31 @@ class NotificationManager {
   Future<void> handleBackgroundMessage(RemoteMessage message) async {
     try {
       await _storageService.saveNotification(message);
+      await _persistInboxEntry(message, NotificationLifecycle.background);
       await _inAppMessageManager.handleRemoteMessage(message);
       _analyticsService.trackNotificationReceived(message);
       await _maybeBridgeDataOnlyMessage(message);
 
+      bool handled =
+          await _invokeUnifiedHandler(message, NotificationLifecycle.background);
+
       if (_backgroundMessageCallback != null) {
         try {
-          final bool handled = await _backgroundMessageCallback!(message);
-          if (!handled) {
-            await _queueBackgroundMessage(message);
-          } else {
-            await _storageService.clearQueuedBackgroundMessages(
-                messageId: message.messageId);
-          }
+          final bool callbackHandled = await _backgroundMessageCallback!(message);
+          handled = handled && callbackHandled;
         } catch (error, stack) {
           _logMessage(
               '[NotificationManager] Background callback error: $error');
           _logMessage('[NotificationManager] Stack trace: $stack');
-          await _queueBackgroundMessage(message);
+          handled = false;
         }
+      }
+
+      if (!handled) {
+        await _queueBackgroundMessage(message);
+      } else {
+        await _storageService.clearQueuedBackgroundMessages(
+            messageId: message.messageId);
       }
     } catch (error, stack) {
       _logMessage(
@@ -668,6 +708,7 @@ class NotificationManager {
           'queuedBackgroundMessages': queuedBackgroundMessages,
           'dataBridgeEnabled': _dataOnlyMessageBridge != null,
           'backgroundHandlerRegistered': _backgroundHandlerRegistered,
+          'invalidPayloadCount': _invalidPayloadCount,
         },
       );
     } catch (error, stack) {
@@ -692,11 +733,25 @@ class NotificationManager {
       return;
     }
     try {
+      final Map<String, dynamic> data = Map<String, dynamic>.from(message.data);
+      if (!_validateBridgingPayload(data)) {
+        return;
+      }
       await _dataOnlyMessageBridge!(message);
     } catch (error, stack) {
       _logMessage('[NotificationManager] Data-only bridge error: $error');
       _logMessage('[NotificationManager] Stack trace: $stack');
     }
+  }
+
+  bool _validateBridgingPayload(Map<String, dynamic> data) {
+    return BridgingPayloadValidator.validate(
+      data,
+      onError: (String reason) {
+        _invalidPayloadCount++;
+        _logMessage('[UnifiedHandler] invalid payload: $reason');
+      },
+    );
   }
 
   Future<void> _queueBackgroundMessage(RemoteMessage message) async {
@@ -873,9 +928,13 @@ class NotificationManager {
       final RemoteNotification? notification = message.notification;
 
       await _storageService.saveNotification(message);
+      await _persistInboxEntry(message, NotificationLifecycle.foreground);
       if (notification == null) {
         await _maybeBridgeDataOnlyMessage(message);
       }
+
+      await _invokeUnifiedHandler(
+          message, NotificationLifecycle.foreground);
 
       if (!_foregroundOptions.enabled) {
         return;
@@ -1018,7 +1077,8 @@ class NotificationManager {
   }
 
   void _setupBackgroundNotifications() {
-    _fcmService.onMessageOpenedApp.listen(processNotification);
+    _fcmService.onMessageOpenedApp
+        .listen((message) => unawaited(processNotification(message)));
   }
 
   Future<Stream<NotificationData?>?> _handleInitialNotification(
@@ -1029,18 +1089,15 @@ class NotificationManager {
           await _fcmService.getInitialMessage();
       if (firebaseInitialMessage?.data != null &&
           !_hasFetchedInitialNotification) {
-        processNotification(firebaseInitialMessage!, isFromTerminated: true);
+        await processNotification(
+          firebaseInitialMessage!,
+          isFromTerminated: true,
+          emitToClickStream: includeInitialNotificationInStream,
+        );
         _hasFetchedInitialNotification = true;
 
         if (includeInitialNotificationInStream) {
-          return getNotificationClickStream().startWith(NotificationData(
-            payload: firebaseInitialMessage.data,
-            title: firebaseInitialMessage.notification?.title,
-            body: firebaseInitialMessage.notification?.body,
-            type: NotificationTypeEnum.terminated,
-            isFromTerminated: true,
-            messageId: firebaseInitialMessage.messageId,
-          ));
+          return getNotificationClickStream();
         }
       }
 
@@ -1054,19 +1111,16 @@ class NotificationManager {
             ? jsonDecode(launchDetails!.notificationResponse!.payload!)
             : {};
 
-        processNotification(
+        await processNotification(
           RemoteMessage.fromMap({'data': payload}),
           isFromTerminated: true,
+          emitToClickStream: includeInitialNotificationInStream,
         );
 
         _hasFetchedInitialNotification = true;
 
         if (includeInitialNotificationInStream) {
-          return getNotificationClickStream().startWith(NotificationData(
-            payload: payload,
-            type: NotificationTypeEnum.terminated,
-            isFromTerminated: true,
-          ));
+          return getNotificationClickStream();
         }
       }
 
@@ -1086,42 +1140,108 @@ class NotificationManager {
     NotificationTypeEnum type = NotificationTypeEnum.foreground,
   }) {
     try {
-      if (!isFromTerminated) {
-        _clickStreamController?.add(
-          NotificationData(
-            payload: payload,
-            title: message?.notification?.title,
-            body: message?.notification?.body,
-            imageUrl: message?.notification?.android?.imageUrl ??
-                message?.notification?.apple?.imageUrl,
-            icon: message?.notification?.android?.smallIcon ??
-                message?.notification?.apple?.badge,
-            category: message?.category,
-            timestamp: DateTime.now(),
-            type: type,
-            isFromTerminated: isFromTerminated,
-            messageId: message?.messageId,
-            senderId: message?.senderId,
-            badgeCount: message?.notification?.apple?.badge != null
-                ? int.tryParse(message!.notification!.apple!.badge.toString())
-                : null,
-            isSilent:
-                message?.notification?.android?.channelId?.contains('silent') ??
-                    false,
-            sound: message?.notification?.android?.sound ??
-                message?.notification?.apple?.sound?.name,
-            tag: message?.notification?.android?.tag,
-            metadata: {
-              'ttl': message?.ttl,
-              'collapseKey': message?.collapseKey,
-              'contentAvailable': message?.contentAvailable,
-            },
-          ),
-        );
-      }
+      final NotificationData event = NotificationData(
+        payload: payload,
+        title: message?.notification?.title,
+        body: message?.notification?.body,
+        imageUrl: message?.notification?.android?.imageUrl ??
+            message?.notification?.apple?.imageUrl,
+        icon: message?.notification?.android?.smallIcon ??
+            message?.notification?.apple?.badge,
+        category: message?.category,
+        timestamp: DateTime.now(),
+        type: type,
+        isFromTerminated: isFromTerminated,
+        messageId: message?.messageId,
+        senderId: message?.senderId,
+        badgeCount: message?.notification?.apple?.badge != null
+            ? int.tryParse(message!.notification!.apple!.badge.toString())
+            : null,
+        isSilent:
+            message?.notification?.android?.channelId?.contains('silent') ??
+                false,
+        sound: message?.notification?.android?.sound ??
+            message?.notification?.apple?.sound?.name,
+        tag: message?.notification?.android?.tag,
+        metadata: {
+          'ttl': message?.ttl,
+          'collapseKey': message?.collapseKey,
+          'contentAvailable': message?.contentAvailable,
+        },
+      );
+      _emitOrQueueClick(event);
     } catch (error, stack) {
       _logMessage('[NotificationManager] Add click stream event error: $error');
       _logMessage('[NotificationManager] Stack trace: $stack');
+    }
+  }
+
+  void _emitOrQueueClick(NotificationData? event) {
+    if (event == null) {
+      return;
+    }
+    if (_clickStreamController != null &&
+        _clickStreamController!.hasListener) {
+      _clickStreamController!.add(event);
+    } else {
+      _pendingClickEvents.add(event);
+    }
+  }
+
+  NormalizedMessage _normalizeMessage(
+    RemoteMessage message,
+    NotificationLifecycle lifecycle,
+  ) {
+    final Map<String, dynamic> data = Map<String, dynamic>.from(message.data);
+    Map<String, dynamic>? analytics;
+    final dynamic analyticsRaw = data['analytics'];
+    if (analyticsRaw is Map<String, dynamic>) {
+      analytics = Map<String, dynamic>.from(analyticsRaw);
+    } else if (analyticsRaw is String) {
+      try {
+        final decoded = jsonDecode(analyticsRaw);
+        if (decoded is Map<String, dynamic>) {
+          analytics = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {
+        // ignore parsing errors; fallback to null
+      }
+    }
+
+    final String? imageUrl = message.notification?.android?.imageUrl ??
+        message.notification?.apple?.imageUrl ??
+        data['image'] as String?;
+
+    return NormalizedMessage(
+      id: message.messageId ??
+          data['messageId']?.toString() ??
+          '${DateTime.now().millisecondsSinceEpoch}',
+      title: message.notification?.title ?? data['title'] as String?,
+      body: message.notification?.body ?? data['body'] as String?,
+      imageUrl: imageUrl,
+      data: data,
+      actions: null,
+      receivedAt: DateTime.now(),
+      origin: 'remote',
+      channelId: message.notification?.android?.channelId,
+      analytics: analytics,
+      rawMessage: message,
+      lifecycle: lifecycle,
+    );
+  }
+
+  Future<bool> _invokeUnifiedHandler(
+      RemoteMessage message, NotificationLifecycle lifecycle) async {
+    if (_unifiedMessageHandler == null) {
+      return true;
+    }
+    try {
+      final normalized = _normalizeMessage(message, lifecycle);
+      return await _unifiedMessageHandler!(normalized, lifecycle);
+    } catch (error, stack) {
+      _logMessage('[NotificationManager] Unified handler error: $error');
+      _logMessage('[NotificationManager] Stack trace: $stack');
+      return false;
     }
   }
 
@@ -1219,7 +1339,7 @@ class NotificationManager {
       );
 
       if (scheduled) {
-        _analyticsService.trackNotificationScheduled('recurring', {
+        _analyticsService.trackEvent('notification_scheduled_recurring', {
           'notification_id': id,
           'title': title,
           'repeat_interval': repeatInterval.name,
@@ -1348,5 +1468,87 @@ class NotificationManager {
           '[NotificationManager] Show threaded notification error: $error');
       _logMessage('[NotificationManager] Stack trace: $stack');
     }
+  }
+
+  Future<void> _persistInboxEntry(
+    RemoteMessage message,
+    NotificationLifecycle lifecycle,
+  ) async {
+    try {
+      final Map<String, dynamic> data = Map<String, dynamic>.from(message.data);
+      final String id = message.messageId ??
+          data['id']?.toString() ??
+          '${DateTime.now().millisecondsSinceEpoch}';
+
+      if (_persistedInboxIds.contains(id)) {
+        return;
+      }
+
+      final String? title =
+          message.notification?.title ?? data['title'] as String?;
+      final String? body = message.notification?.body ?? data['body'] as String?;
+
+      if ((title == null || title.isEmpty) &&
+          (body == null || body.isEmpty)) {
+        return;
+      }
+
+      final NotificationInboxItem item = NotificationInboxItem(
+        id: id,
+        title: title ?? '',
+        body: body ?? '',
+        subtitle: data['subtitle'] as String?,
+        timestamp: DateTime.now(),
+        isRead: false,
+        imageUrl: message.notification?.android?.imageUrl ??
+            message.notification?.apple?.imageUrl ??
+            data['image'] as String?,
+        actions: _parseActions(data['actions']),
+        category: data['category'] as String?,
+        data: data,
+      );
+
+      _persistedInboxIds.add(id);
+      await _inboxStorage.upsert(item);
+
+      _analyticsService.trackEvent('inbox_item_persisted', <String, dynamic>{
+        'id': id,
+        'lifecycle': lifecycle.name,
+        'has_actions': item.actions.isNotEmpty,
+      });
+    } catch (error, stack) {
+      _logMessage('[NotificationManager] Inbox persist error: $error');
+      _logMessage('[NotificationManager] Stack trace: $stack');
+    }
+  }
+
+  List<NotificationAction> _parseActions(dynamic rawActions) {
+    if (rawActions is! List) {
+      return const <NotificationAction>[];
+    }
+
+    return rawActions
+        .map((dynamic action) {
+          if (action is! Map) {
+            return null;
+          }
+          final Map<String, dynamic> parsed =
+              Map<String, dynamic>.from(action);
+          final String? id = parsed['id']?.toString();
+          final String? title = parsed['title']?.toString();
+          if (id == null || title == null) {
+            return null;
+          }
+          return NotificationAction(
+            id: id,
+            title: title,
+            destructive: parsed['destructive'] == true,
+            payload: parsed['payload'] is Map
+                ? Map<String, dynamic>.from(parsed['payload'] as Map)
+                : null,
+          );
+        })
+        .whereType<NotificationAction>()
+        .toList();
   }
 }

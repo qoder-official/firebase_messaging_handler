@@ -88,6 +88,9 @@ clickStream?.listen((NotificationData? data) {
 - **🌐 Web-Safe Fallbacks** - Gracefully degrade scheduling/actions/badges when unsupported in browsers
 - **🌙 Quiet Hours & Frequency Caps** - Control delivery cadence with lifecycle-aware helpers
 - **🔄 Data-Only Bridging** - Promote silent payloads into local notifications when needed
+- **📥 Inbox Storage** - Typed inbox model with SharedPreferences default and
+  in-memory test store for read/delete flows
+- **🔁 Unified Handler** - Single callback for foreground/background/terminated with normalized payloads
 - **🪄 In-App Messaging** - Trigger rich in-app templates from silent FCM payloads
 - **🛡️ Foreground Controls** - Fully customize fallback foreground notifications
 - **🎭 In-App Templates** - Welcome, promotion, alert, success, and info templates
@@ -159,6 +162,22 @@ dependencies:
    );
    ```
    > Use your own top-level handler if you need custom logic—just remember to call `FirebaseMessagingHandler.handleBackgroundMessage(message)` first.
+
+### **Unified Handler (all lifecycles)**
+```dart
+await FirebaseMessagingHandler.instance.setUnifiedMessageHandler(
+  (NormalizedMessage message, NotificationLifecycle lifecycle) async {
+    debugPrint('[unified] lifecycle=$lifecycle title=${message.title}');
+    // Return true to mark handled and skip default rendering; false to let the plugin render/queue.
+    if (lifecycle == NotificationLifecycle.foreground) {
+      // e.g., custom in-app banner instead of system notification
+      return true;
+    }
+    return false;
+  },
+);
+```
+Handler receives normalized fields (id, title, body, data, channelId, analytics, lifecycle, rawMessage). Works for foreground, background, resume, and terminated paths.
 
 5. **Done!** Your app now handles Firebase notifications.
 
@@ -367,12 +386,9 @@ void main() async {
     }
   });
 
-  // Check for initial notification (if app was launched from notification)
-  final NotificationData? initialData = await FirebaseMessagingHandler.instance.checkInitial();
-  if (initialData != null) {
-    print('App launched from notification: ${initialData.title}');
-    // Handle initial notification
-  }
+  // Initial launch notifications are emitted onto the same stream by default.
+  // Set includeInitialNotificationInStream: false to opt out if you need to
+  // defer handling (e.g., until after auth).
 
   runApp(MyApp());
 }
@@ -498,6 +514,51 @@ await FirebaseMessagingHandler.instance.showNotificationWithActions(
       payload: {'action': 'dismiss'},
     ),
   ],
+);
+```
+
+### **📥 Inbox Storage (typed, persistent)**
+
+Use the default SharedPreferences-backed inbox store to fuel a history or inbox
+UI with read/delete support.
+
+```dart
+final inbox = InboxStorageService();
+
+await inbox.upsert(
+  NotificationInboxItem(
+    id: 'welcome',
+    title: 'Welcome!',
+    body: 'Thanks for installing the app.',
+    timestamp: DateTime.now(),
+    data: {'origin': 'campaign_welcome'},
+  ),
+);
+
+final List<NotificationInboxItem> page =
+    await inbox.fetch(page: 0, pageSize: 20);
+
+await inbox.markRead([page.first.id]);
+await inbox.delete([page.first.id]);
+```
+
+> For tests or ephemeral state, use `InMemoryInboxStorage`, which keeps items
+> purely in memory.
+
+#### Inbox UI widget
+
+```dart
+NotificationInboxView(
+  storage: InboxStorageService(),
+  onItemTap: (item) {
+    // Navigate or open detail
+  },
+  onActionTap: (actionId, item) {
+    // Handle custom buttons stored in item.actions
+  },
+  onDelete: (ids) async {
+    // Optional: sync deletions to backend
+  },
 );
 ```
 
@@ -1181,6 +1242,7 @@ if (!diagnostics.success || diagnostics.recommendations.isNotEmpty) {
 - `webNotificationsAllowed` / `metadata['webPermission']` – browser permission string.
 - `metadata['backgroundHandlerRegistered']` – confirms `configureBackgroundMessageHandler` has been invoked.
 - `pendingNotificationCount` – number of locally scheduled notifications.
+- `metadata['invalidPayloadCount']` – how many malformed data-only payloads were rejected by the bridge/schema guard.
 
 ### **Background Message Helper**
 
@@ -1380,13 +1442,13 @@ Future<Stream<NotificationData?>?> init({
   required List<NotificationChannelData> androidChannelList,
   required String androidNotificationIconPath,
   Future<bool> Function(String fcmToken)? updateTokenCallback,
-  bool includeInitialNotificationInStream = false,
+  bool includeInitialNotificationInStream = true,
 })
 ```
 
 #### **Initial Notification Handling**
 ```dart
-Future<NotificationData?> checkInitial()
+Future<NotificationData?> checkInitial() // optional fallback; auto-handled by default
 ```
 
 #### **Notification Display**
@@ -1445,7 +1507,27 @@ Future<void> configureBackgroundMessageHandler(
 static Future<void> handleBackgroundMessage(RemoteMessage message)
 
 Future<NotificationDiagnosticsResult> runDiagnostics()
+
+Future<void> setUnifiedMessageHandler(
+  Future<bool> Function(NormalizedMessage message, NotificationLifecycle lifecycle) handler,
+)
 ```
+
+#### **Inbox Storage**
+
+- `fetch({int page = 0, int pageSize = 20})` →
+  `Future<List<NotificationInboxItem>>`
+- `upsert(NotificationInboxItem item)`
+- `upsertAll(List<NotificationInboxItem> items)`
+- `markRead(List<String> ids, {bool isRead = true})`
+- `delete(List<String> ids)`
+- `clear()`
+- `count({bool unreadOnly = false})`
+
+Implementations:
+
+- `InboxStorageService` – SharedPreferences-backed persistence.
+- `InMemoryInboxStorage` – memory-only, ideal for tests.
 
 #### **Badge Management**
 ```dart
@@ -1722,10 +1804,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🎉 **What's Next?**
 
-- **📱 Example App** - Launch the FCM showcase demo
-- **📚 API Reference** - Complete method documentation
-- **🧪 Testing** - Try the testing utilities
-- **🚀 Production** - Deploy with confidence
+- **In-App UX Kit v1** – survey carousel, tooltip, edge-to-edge banner, HTML modal with safe defaults.
+- **Notification Inbox Widget** – themable list with read/delete and storage abstraction.
+- **Unified Handler + Schema Guard** – single callback across lifecycles with strict data-only validator.
+- **Permission Wizard & Quiet Hours** – guided POST_NOTIFICATIONS/exact alarm/APNs readiness plus defer/cap policies.
+- **Web Polish** – permission overlay, custom icons/badges, service worker validator with actionable logs.
+- **Journeys & Server Recipes** – ready payloads (welcome, win-back, NPS) plus Cloud Functions/REST examples under `server_recipes/`.
+- **Example App Upgrades** – Notification Doctor tab, payload simulator, inbox + in-app demos.
 
 ---
 

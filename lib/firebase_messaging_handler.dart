@@ -9,6 +9,7 @@ export 'src/enums/export.dart';
 export 'src/models/export.dart';
 export 'src/core/export.dart';
 export 'src/in_app/export.dart';
+export 'src/inbox/export.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingHandlerBackgroundDispatcher(
@@ -59,7 +60,7 @@ class FirebaseMessagingHandler {
     required final List<NotificationChannelData> androidChannelList,
     required final String androidNotificationIconPath,
     final Future<bool> Function(String fcmToken)? updateTokenCallback,
-    final bool includeInitialNotificationInStream = false,
+    final bool includeInitialNotificationInStream = true,
   }) async {
     return await _notificationManager.initialize(
       senderId: senderId,
@@ -227,8 +228,8 @@ class FirebaseMessagingHandler {
     }
 
     _mockRemoteMessageController?.add(message);
-    FirebaseMessagingHandler.instance._notificationManager
-        .processNotification(message);
+    unawaited(FirebaseMessagingHandler.instance._notificationManager
+        .processNotification(message));
   }
 
   /// Gets mock click stream for testing
@@ -591,6 +592,15 @@ class FirebaseMessagingHandler {
   /// Applies delivery throttling, quiet hours, and frequency caps for in-app templates.
   Future<void> setInAppDeliveryPolicy(InAppDeliveryPolicy policy) async {
     await _notificationManager.setInAppDeliveryPolicy(policy);
+  }
+
+  /// Registers a unified handler for all notification lifecycles (foreground, background, terminated).
+  /// Returns `true` from the handler when fully handled; return `false` to allow default pipeline or queue.
+  Future<void> setUnifiedMessageHandler(
+      Future<bool> Function(
+              NormalizedMessage message, NotificationLifecycle lifecycle)?
+          handler) async {
+    await _notificationManager.setUnifiedMessageHandler(handler);
   }
 
   /// Registers a background message handler. The handler must be a top-level or

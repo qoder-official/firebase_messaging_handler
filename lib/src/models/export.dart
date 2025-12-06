@@ -5,3 +5,5 @@ export 'in_app_notification_template.dart';
 export 'foreground_notification_options.dart';
 export 'notification_diagnostics_result.dart';
 export 'in_app_delivery_policy.dart';
+export 'normalized_message.dart';
+export 'notification_inbox_item.dart';

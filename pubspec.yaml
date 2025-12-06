@@ -1,14 +1,14 @@
 name: firebase_messaging_handler
-description: A comprehensive Flutter plugin for handling Firebase Cloud Messaging notifications with advanced features.
+description: "Flutter FCM superpack: unified click stream (FG/BG/terminated), auto-initial handling, data-only bridge, inbox, in-app UX, badges, sounds, and web polish."
 version: 1.0.0
-homepage: https://github.com/neel-sharma/firebase_messaging_handler
-repository: https://github.com/neel-sharma/firebase_messaging_handler
-issue_tracker: https://github.com/neel-sharma/firebase_messaging_handler/issues
-documentation: https://github.com/neel-sharma/firebase_messaging_handler#readme
+homepage: https://github.com/qoder-official/firebase_messaging_handler
+repository: https://github.com/qoder-official/firebase_messaging_handler
+issue_tracker: https://github.com/qoder-official/firebase_messaging_handler/issues
+documentation: https://github.com/qoder-official/firebase_messaging_handler#readme
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.10.0"
+  sdk: ">=3.2.0 <4.0.0"
+  flutter: ">=3.3.0"
 
 dependencies:
   flutter:
@@ -40,10 +40,24 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ">=6.0.0"
+  alchemist: ">=0.13.0"
+
+topics:
+  - fcm
+  - firebase-messaging
+  - push-notifications
+  - local-notifications
+  - unified-handler
+  - in-app-messaging
+  - notification-inbox
+  - background
+  - web-push
+  - flutter
 
 # Platform-specific configuration
 flutter:
+  uses-material-design: true
   plugin:
     platforms:
       ios:

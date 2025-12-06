@@ -31,6 +31,7 @@ build/
 /example/android/app/google-services.json
 /example/lib/firebase_options.dart
 
-/.internal/STATUS.md
+/.internal/
 
 /AGENTS.md
+/reference/
