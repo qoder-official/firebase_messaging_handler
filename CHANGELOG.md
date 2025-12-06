@@ -1,4 +1,4 @@
-## 1.0.0-beta.1
+## 0.1.0-beta.1
 - Beta preview of the FCM superpack:
   - Auto initial-notification emission onto the unified click stream (opt-out available).
   - Unified handler (FG/BG/terminated) with normalized payloads.

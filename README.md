@@ -3,7 +3,7 @@
 > **🎯 One-Stop Push & In-App Messaging for Firebase Cloud Messaging** – Handle everything from reliable click streams to scheduling, actions, quiet hours, and rich in-app templates. Zero breaking changes, maximum flexibility!
 
 [![pub package](https://img.shields.io/pub/v/firebase_messaging_handler.svg)](https://pub.dev/packages/firebase_messaging_handler)
-[![beta](https://img.shields.io/badge/beta-1.0.0--beta.1-orange)](https://pub.dev/packages/firebase_messaging_handler/versions/1.0.0-beta.1)
+[![beta](https://img.shields.io/badge/beta-0.1.0--beta.1-orange)](https://pub.dev/packages/firebase_messaging_handler/versions/0.1.0-beta.1)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 📋 **Table of Contents**
@@ -111,7 +111,7 @@ Your app starts simple and scales only when you opt in. Every capability ships w
 - **Navigation flexibility**: Showcase example routes via a root `Navigator` key, demonstrating payload-driven navigation without relying on a BuildContext.
 
 ### **Beta channel**
-- Install the beta: `firebase_messaging_handler: 1.0.0-beta.1`
+- Install the beta: `firebase_messaging_handler: 0.1.0-beta.1`
 - Includes: auto initial-notification stream, unified handler, inbox widget + storage, data-only bridge, payload validator, refreshed docs, and new tests/goldens.
 - Stable users can stay pinned to `0.1.0` until ready to adopt the beta line.
 
