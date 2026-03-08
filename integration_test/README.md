@@ -92,21 +92,8 @@ bash test/firebase_config/terminated_state_manual.sh \
 
 ## CI integration
 
-No action required. When `test/firebase_config/service_account.json` is absent
-(the default in CI), all real-FCM tests emit `SKIP` rather than `FAIL`.
+There is no automated CI pipeline. All tests are run manually.
 
-To run real-FCM tests in CI, add the service account JSON as a CI secret and
-restore it before the test step:
-
-```yaml
-- name: Restore FCM service account
-  run: echo "$FCM_SERVICE_ACCOUNT" > test/firebase_config/service_account.json
-  env:
-    FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
-
-- name: Run real-FCM integration tests
-  run: |
-    flutter test integration_test/real_push/real_push_test.dart \
-      --dart-define=FCM_TEST_SENDER_ID=${{ secrets.FCM_SENDER_ID }} \
-      --device-id ${{ secrets.DEVICE_ID }}
-```
+When `test/firebase_config/service_account.json` is absent, all real-FCM
+tests emit `SKIP` rather than `FAIL` — so running the full test suite locally
+without credentials is always safe.
