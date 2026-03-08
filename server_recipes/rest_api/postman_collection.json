@@ -1,0 +1,129 @@
+{
+  "info": {
+    "name": "firebase_messaging_handler FCM Recipes",
+    "_postman_id": "8d0b1bf8-4832-4f59-9b89-9d014c4ad5f3",
+    "description": "FCM HTTP v1 recipes aligned with firebase_messaging_handler payload conventions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "project_id",
+      "value": "your-firebase-project-id"
+    },
+    {
+      "key": "fcm_access_token",
+      "value": "ya29.your-access-token"
+    },
+    {
+      "key": "device_token",
+      "value": "device-token-from-app"
+    }
+  ],
+  "item": [
+    {
+      "name": "Basic Push",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{fcm_access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "https://fcm.googleapis.com/v1/projects/{{project_id}}/messages:send",
+          "protocol": "https",
+          "host": [
+            "fcm",
+            "googleapis",
+            "com"
+          ],
+          "path": [
+            "v1",
+            "projects",
+            "{{project_id}}",
+            "messages:send"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": {\n    \"token\": \"{{device_token}}\",\n    \"notification\": {\n      \"title\": \"Order shipped\",\n      \"body\": \"Track package #A-1042 in the app.\"\n    },\n    \"data\": {\n      \"deeplink\": \"app://orders/A-1042\",\n      \"analytics\": \"{\\\"campaign\\\":\\\"shipping_update\\\",\\\"source\\\":\\\"postman\\\"}\"\n    }\n  }\n}"
+        }
+      }
+    },
+    {
+      "name": "Data-Only Bridge",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{fcm_access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "https://fcm.googleapis.com/v1/projects/{{project_id}}/messages:send",
+          "protocol": "https",
+          "host": [
+            "fcm",
+            "googleapis",
+            "com"
+          ],
+          "path": [
+            "v1",
+            "projects",
+            "{{project_id}}",
+            "messages:send"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": {\n    \"token\": \"{{device_token}}\",\n    \"data\": {\n      \"title\": \"Inventory back in stock\",\n      \"body\": \"SKU #48319 is available again.\",\n      \"deeplink\": \"app://inventory/48319\",\n      \"channelId\": \"inventory_updates\",\n      \"priority\": \"high\",\n      \"analytics\": \"{\\\"campaign\\\":\\\"restock_alert\\\",\\\"sku\\\":\\\"48319\\\"}\",\n      \"actions\": \"[{\\\"id\\\":\\\"open\\\",\\\"title\\\":\\\"Open\\\",\\\"payload\\\":{\\\"screen\\\":\\\"inventory\\\",\\\"sku\\\":\\\"48319\\\"}},{\\\"id\\\":\\\"dismiss\\\",\\\"title\\\":\\\"Dismiss\\\",\\\"destructive\\\":true}]\"\n    },\n    \"android\": {\n      \"priority\": \"high\"\n    },\n    \"apns\": {\n      \"headers\": {\n        \"apns-priority\": \"5\"\n      },\n      \"payload\": {\n        \"aps\": {\n          \"content-available\": 1\n        }\n      }\n    }\n  }\n}"
+        }
+      }
+    },
+    {
+      "name": "In-App Template",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{fcm_access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "https://fcm.googleapis.com/v1/projects/{{project_id}}/messages:send",
+          "protocol": "https",
+          "host": [
+            "fcm",
+            "googleapis",
+            "com"
+          ],
+          "path": [
+            "v1",
+            "projects",
+            "{{project_id}}",
+            "messages:send"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": {\n    \"token\": \"{{device_token}}\",\n    \"data\": {\n      \"fcmh_inapp\": \"{\\\"id\\\":\\\"promo_2026_launch\\\",\\\"templateId\\\":\\\"builtin_generic\\\",\\\"trigger\\\":\\\"immediate\\\",\\\"content\\\":{\\\"layout\\\":\\\"banner\\\",\\\"title\\\":\\\"New feature live\\\",\\\"body\\\":\\\"Try the diagnostics panel today.\\\",\\\"cta_label\\\":\\\"Open\\\",\\\"deeplink\\\":\\\"app://diagnostics\\\"},\\\"analytics\\\":{\\\"campaignId\\\":\\\"launch_2026\\\",\\\"variant\\\":\\\"A\\\"}}\"\n    }\n  }\n}"
+        }
+      }
+    }
+  ]
+}

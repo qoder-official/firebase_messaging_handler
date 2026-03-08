@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a defect in the package or example app.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Repro details matter here because behavior differs across Android, iOS, macOS, and web.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and the expected behavior.
+      placeholder: Notification tap is dropped after cold start on Android 14.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Include exact setup steps, payload, and whether this happens in the example app.
+      placeholder: |
+        1. Launch the example app on a physical Android device.
+        2. Send this payload...
+        3. Tap the notification from terminated state.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or stack trace
+      description: Paste relevant `flutter run`, native, or Firebase logs.
+      render: shell
+  - type: input
+    id: package_version
+    attributes:
+      label: Package version
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: flutter_version
+    attributes:
+      label: Flutter version
+      placeholder: 3.29.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Affected platform
+      multiple: true
+      options:
+        - Android
+        - iOS
+        - macOS
+        - Web
+        - Other
+    validations:
+      required: true

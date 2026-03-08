@@ -1,0 +1,49 @@
+name: firebase_messaging_handler_example
+description: A comprehensive showcase application demonstrating all features of the Firebase Messaging Handler plugin.
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Material Design icons
+  cupertino_icons: ^1.0.8
+
+  # Firebase Core (required for Firebase services)
+  firebase_core: ">=4.2.0"
+  
+  # Firebase Cloud Messaging
+  firebase_messaging: ">=16.0.0"
+
+  # Firebase Messaging Handler Plugin (local development)
+  firebase_messaging_handler:
+    path: ../
+
+  # State management
+  provider: ^6.1.4
+  
+  # URL launching for external links
+  url_launcher: ^6.3.1
+  
+  # Clipboard operations
+  clipboard: ^2.0.2
+  
+  # Persistent storage for timeline caching
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
+  googleapis_auth: ">=2.0.0 <3.0.0"
+  http: ">=1.0.0 <2.0.0"
+
+flutter:
+  uses-material-design: true

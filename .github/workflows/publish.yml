@@ -1,0 +1,66 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.0.2) — must already be set in pubspec.yaml'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # pub.dev OIDC trusted publishing
+      contents: write  # push git tag
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify version matches pubspec.yaml
+        run: |
+          PUBSPEC_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          if [[ "${{ inputs.version }}" != "${PUBSPEC_VERSION}" ]]; then
+            echo "❌ Input '${{ inputs.version }}' does not match pubspec.yaml '${PUBSPEC_VERSION}'"
+            exit 1
+          fi
+          echo "✅ Version confirmed: ${{ inputs.version }}"
+
+      - name: Check tag does not already exist
+        run: |
+          if git ls-remote --tags origin "v${{ inputs.version }}" | grep -q .; then
+            echo "❌ Tag v${{ inputs.version }} already exists — bump the version first"
+            exit 1
+          fi
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Dry run
+        run: dart pub publish --dry-run
+
+      - name: Publish to pub.dev
+        run: dart pub publish -f
+
+      - name: Tag release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
