@@ -7,28 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
-
----
-
 ## [1.0.0] - 2026-03-08
 
 ### Added
-- **Android platform support** — proper Kotlin plugin stub registered; Android now declared in `flutter.plugin.platforms`
-- **macOS platform support** — Dart plugin stub for macOS; firebase_messaging macOS support now exposed
-- **`lastTokenError` property** on `FirebaseMessagingHandler.instance` — surfaces exact, human-readable reason when FCM token could not be retrieved (e.g. APNs not configured, running on simulator)
-- **`tokenError` in `NotificationProvider`** (example app) — UI now shows the exact diagnostic message instead of generic "waiting" text when token is unavailable
+- **Android & macOS platform support** — both platforms now fully declared
+- **`lastTokenError`** on `FirebaseMessagingHandler.instance` — surfaces the exact reason an FCM token could not be retrieved (e.g. APNs not configured, simulator)
 
 ### Changed
-- **`flutter_local_notifications` constraint** relaxed from `>=18.0.1 <19.0.0` to `>=18.0.1 <22.0.0` — now compatible with v19, v20, and v21 (current release)
-- **FCM token errors surface as text, not mock tokens** — removed `mock_fcm_token_simulator_*` and `mock_fcm_token_apns_not_set_*` returns that were silently corrupting backend records; these cases now return `null` with a detailed log and `lastTokenError` set
-
-### Fixed
-- Removed unnecessary `library firebase_messaging_handler` directive (`unnecessary_library_name`)
-- Removed redundant imports in `notification_manager.dart` (`normalized_message.dart`, `notification_lifecycle_enum.dart`)
-- Removed redundant import in `firebase_messaging_handler_notification_service.dart` (`repeat_interval_enum.dart`)
-- Fixed unnecessary brace in string interpolation in `permission_wizard_service.dart`
-- `dart analyze lib/` now returns **0 issues**
+- **`flutter_local_notifications` constraint** widened to `>=18.0.1 <22.0.0` — compatible with v19, v20, and v21
+- **FCM token failures now return `null`** instead of silent mock tokens — check `lastTokenError` for the reason
 
 ---
 
