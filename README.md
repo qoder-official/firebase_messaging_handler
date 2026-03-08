@@ -3,8 +3,6 @@
 > **🎯 One-Stop Push & In-App Messaging for Firebase Cloud Messaging** – Handle everything from reliable click streams to scheduling, actions, quiet hours, and rich in-app templates. Zero breaking changes, maximum flexibility!
 
 [![pub package](https://img.shields.io/pub/v/firebase_messaging_handler.svg)](https://pub.dev/packages/firebase_messaging_handler)
-[![CI](https://github.com/qoder-official/firebase_messaging_handler/actions/workflows/ci.yml/badge.svg)](https://github.com/qoder-official/firebase_messaging_handler/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/qoder-official/firebase_messaging_handler/graph/badge.svg)](https://codecov.io/gh/qoder-official/firebase_messaging_handler)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 ## 📋 **Table of Contents**

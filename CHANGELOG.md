@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-03-08
+
+### Fixed
+- Removed broken CI and codecov badges from README
+
+---
+
 ## [1.0.0] - 2026-03-08
 
 ### Added
