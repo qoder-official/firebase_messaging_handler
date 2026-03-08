@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.2] - 2026-03-08
+
+### Changed
+- `flutter_local_notifications` lower bound tightened to `^21.0.0` — aligns constraint with the v21 named parameter API the package actually requires
+
+---
+
 ## [1.0.1] - 2026-03-08
 
 ### Changed
