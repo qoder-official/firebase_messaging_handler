@@ -30,6 +30,8 @@ build/
 /example/firebase.json
 /example/android/app/google-services.json
 /example/lib/firebase_options.dart
+/example/ios/Runner/GoogleService-Info.plist
+/example/macos/Runner/GoogleService-Info.plist
 
 /.internal/
 
