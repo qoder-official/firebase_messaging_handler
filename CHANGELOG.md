@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.3] - 2026-03-08
+
+### Added
+- **Swift Package Manager (SPM) support** — `ios/Package.swift` added; iOS plugin now resolves via SPM in addition to CocoaPods
+
+### Changed
+- **WASM compatibility** — replaced `universal_html` dependency with `dart:js_interop`-based abstraction; package now passes WASM analysis
+- iOS native stub simplified — removed unused `FirebaseCore`/`FirebaseMessaging` imports (FCM is handled entirely by `firebase_messaging`)
+
+---
+
 ## [1.0.2] - 2026-03-08
 
 ### Changed

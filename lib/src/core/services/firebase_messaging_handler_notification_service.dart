@@ -4,8 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:universal_html/js.dart' as js;
-import '../utils/js_compat.dart' as js_compat;
+import '../utils/web_interop.dart' as web_interop;
 import '../interfaces/notification_service_interface.dart';
 import '../managers/notification_manager.dart';
 import '../../enums/export.dart';
@@ -531,16 +530,7 @@ class FirebaseMessagingHandlerNotificationService
     }
 
     try {
-      if (js.context.hasProperty('Notification')) {
-        final dynamic notification = js.context['Notification'];
-        if (notification != null && notification.hasProperty('permission')) {
-          final dynamic permission = notification['permission'];
-          if (permission is String) {
-            return permission;
-          }
-        }
-      }
-      return 'unknown';
+      return web_interop.getWebNotificationPermission();
     } catch (error, stack) {
       _logMessage('[NotificationService] Web permission status error: $error');
       _logMessage('[NotificationService] Stack trace: $stack');
@@ -558,59 +548,7 @@ class FirebaseMessagingHandlerNotificationService
     }
 
     try {
-      final bool notificationApiAvailable =
-          js.context.hasProperty('Notification');
-      final dynamic navigator = js.context['navigator'];
-      final bool navigatorAvailable = navigator != null;
-      final bool serviceWorkerApiAvailable =
-          navigatorAvailable && navigator.hasProperty('serviceWorker');
-      final dynamic serviceWorker = serviceWorkerApiAvailable
-          ? navigator['serviceWorker']
-          : null;
-      final bool serviceWorkerControllerPresent = serviceWorker != null &&
-          serviceWorker.hasProperty('controller') &&
-          serviceWorker['controller'] != null;
-      final bool pushManagerAvailable =
-          serviceWorker != null && serviceWorker.hasProperty('ready');
-
-      bool isSecureContext = false;
-      if (js.context.hasProperty('isSecureContext')) {
-        final dynamic secureContext = js.context['isSecureContext'];
-        if (secureContext is bool) {
-          isSecureContext = secureContext;
-        }
-      }
-
-      String? locationProtocol;
-      String? locationHost;
-      if (js.context.hasProperty('location')) {
-        final dynamic location = js.context['location'];
-        if (location != null) {
-          if (location.hasProperty('protocol')) {
-            locationProtocol = location['protocol']?.toString();
-          }
-          if (location.hasProperty('host')) {
-            locationHost = location['host']?.toString();
-          }
-        }
-      }
-
-      String? userAgent;
-      if (navigatorAvailable && navigator.hasProperty('userAgent')) {
-        userAgent = navigator['userAgent']?.toString();
-      }
-
-      return <String, dynamic>{
-        'supported': notificationApiAvailable,
-        'notificationApiAvailable': notificationApiAvailable,
-        'serviceWorkerApiAvailable': serviceWorkerApiAvailable,
-        'serviceWorkerControllerPresent': serviceWorkerControllerPresent,
-        'pushManagerLikelyAvailable': pushManagerAvailable,
-        'isSecureContext': isSecureContext,
-        'locationProtocol': locationProtocol,
-        'locationHost': locationHost,
-        'userAgent': userAgent,
-      };
+      return web_interop.getWebRuntimeDiagnostics();
     } catch (error, stack) {
       _logMessage('[NotificationService] Web runtime diagnostics error: $error');
       _logMessage('[NotificationService] Stack trace: $stack');
@@ -631,31 +569,14 @@ class FirebaseMessagingHandlerNotificationService
     try {
       if (!isWeb) return;
 
-      if (await _requestWebNotificationPermission()) {
-        final options = js.JsObject.jsify({
-          'body': body,
-          'icon': icon,
-          'badge': '/icons/Icon-72.png',
-          'tag': 'firebase-notification',
-          'data': js.JsObject.jsify(data),
-          'requireInteraction': false,
-          'silent': false,
-        });
+      await web_interop.showWebNotification(
+        title: title,
+        body: body,
+        icon: icon,
+        data: data,
+      );
 
-        final notification =
-            js.JsObject.fromBrowserObject(js.context['Notification']);
-        final notificationInstance =
-            notification.callMethod('new', [title, options]);
-
-        notificationInstance.callMethod('addEventListener', [
-          'click',
-          js_compat.allowInterop((event) {
-            _handleWebNotificationClick(data);
-          }),
-        ]);
-
-        _logMessage('[NotificationService] Web notification displayed: $title');
-      }
+      _logMessage('[NotificationService] Web notification displayed: $title');
     } catch (error, stack) {
       _logMessage('[NotificationService] Show web notification error: $error');
       _logMessage('[NotificationService] Stack trace: $stack');
@@ -896,45 +817,6 @@ class FirebaseMessagingHandlerNotificationService
     } catch (error, stack) {
       _logMessage(
           '[NotificationService] Configure iOS categories error: $error');
-      _logMessage('[NotificationService] Stack trace: $stack');
-    }
-  }
-
-  Future<bool> _requestWebNotificationPermission() async {
-    try {
-      if (!isWeb) return false;
-
-      if (js.context.hasProperty('Notification')) {
-        final notification =
-            js.JsObject.fromBrowserObject(js.context['Notification']);
-
-        if (notification.hasProperty('permission')) {
-          final permission = notification['permission'];
-
-          if (permission == 'granted') {
-            return true;
-          } else if (permission == 'default') {
-            final requestResult =
-                await notification.callMethod('requestPermission');
-            return requestResult == 'granted';
-          }
-        }
-      }
-
-      return false;
-    } catch (error, stack) {
-      _logMessage('[NotificationService] Request web permission error: $error');
-      _logMessage('[NotificationService] Stack trace: $stack');
-      return false;
-    }
-  }
-
-  void _handleWebNotificationClick(Map<String, dynamic> data) {
-    try {
-      // Handle web notification click
-      _logMessage('[NotificationService] Web notification clicked');
-    } catch (error, stack) {
-      _logMessage('[NotificationService] Handle web click error: $error');
       _logMessage('[NotificationService] Stack trace: $stack');
     }
   }

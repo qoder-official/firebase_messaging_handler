@@ -1,21 +1,10 @@
 import Flutter
 import UIKit
-import FirebaseCore
-import FirebaseMessaging
 
 public class FirebaseMessagingHandlerPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(name: "firebase_messaging_handler", binaryMessenger: registrar.messenger())
-    let instance = FirebaseMessagingHandlerPlugin()
-    registrar.addMethodCallDelegate(instance, channel: channel)
-  }
-
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    switch call.method {
-    case "getPlatformVersion":
-      result("iOS " + UIDevice.current.systemVersion)
-    default:
-      result(FlutterMethodNotImplemented)
-    }
+    // No native method channels needed — all FCM work is handled by
+    // the firebase_messaging package. This stub satisfies the Flutter
+    // plugin registry requirement.
   }
 }

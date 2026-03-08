@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'firebase_messaging_handler'
-  s.version          = '1.0.0'
+  s.version          = '1.0.3'
   s.summary          = 'Production-ready Flutter plugin for Firebase Cloud Messaging with inbox, in-app UX, badges, diagnostics, and scheduling.'
   s.description      = <<-DESC
 Production-ready Flutter plugin for Firebase Cloud Messaging with a unified click stream, notification inbox, in-app messaging, diagnostics, badges, and scheduling.
@@ -15,8 +15,6 @@ Production-ready Flutter plugin for Firebase Cloud Messaging with a unified clic
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'Firebase/Core'
-  s.dependency 'Firebase/Messaging'
   s.platform = :ios, '13.0'
 
   # Flutter.framework does not contain a i386 slice.
