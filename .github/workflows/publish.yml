@@ -2,16 +2,16 @@ name: Publish
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # Required for pub.dev trusted publishing (OIDC)
-      contents: read
+      id-token: write  # pub.dev OIDC trusted publishing
+      contents: write  # push git tag
 
     steps:
       - name: Checkout
@@ -26,19 +26,34 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Verify tag matches pubspec version
-        if: github.ref_type == 'tag'
-        shell: bash
-        run: |
-          VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
-          if [[ "v${VERSION}" != "${GITHUB_REF_NAME}" ]]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match pubspec version v${VERSION}"
-            exit 1
-          fi
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
 
       - name: Dry run
         run: dart pub publish --dry-run
 
+      - name: Read version & check if tag exists
+        id: version
+        run: |
+          VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          echo "version=v${VERSION}" >> $GITHUB_OUTPUT
+          if git ls-remote --tags origin "v${VERSION}" | grep -q .; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish to pub.dev
-        if: github.ref_type == 'tag'
+        if: steps.version.outputs.exists == 'false'
         run: dart pub publish -f
+
+      - name: Tag release
+        if: steps.version.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
