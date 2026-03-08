@@ -19,9 +19,9 @@ import 'test_dashboard.dart';
 ///
 ///   BASE64=$(base64 -i ../test/firebase_config/service_account.json | tr -d '\n')
 ///   flutter test integration_test/comprehensive_test.dart \
-///     --dart-define=FCM_TEST_SENDER_ID=903635434365 \
+///     --dart-define=FCM_TEST_SENDER_ID=`<your-project-number>` \
 ///     --dart-define=FCM_SERVICE_ACCOUNT_B64=$BASE64 \
-///     --device-id `<device-id>`
+///     --device-id `<your-device-id>`
 ///
 /// Without credentials, FCM-send tests are SKIPPED — CI stays green.
 
