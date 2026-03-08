@@ -5,11 +5,11 @@
 Pod::Spec.new do |s|
   s.name             = 'firebase_messaging_handler'
   s.version          = '1.0.0'
-  s.summary          = 'A comprehensive Flutter plugin for handling Firebase Cloud Messaging notifications with advanced features.'
+  s.summary          = 'Production-ready Flutter plugin for Firebase Cloud Messaging with inbox, in-app UX, badges, diagnostics, and scheduling.'
   s.description      = <<-DESC
-A comprehensive Flutter plugin for handling Firebase Cloud Messaging notifications with advanced features.
+Production-ready Flutter plugin for Firebase Cloud Messaging with a unified click stream, notification inbox, in-app messaging, diagnostics, badges, and scheduling.
                        DESC
-  s.homepage         = 'https://github.com/neel-sharma/firebase_messaging_handler'
+  s.homepage         = 'https://github.com/qoder-official/firebase_messaging_handler'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Qoder' => 'neel@qoder.com' }
   s.source           = { :path => '.' }

@@ -3,14 +3,16 @@
 > **🎯 One-Stop Push & In-App Messaging for Firebase Cloud Messaging** – Handle everything from reliable click streams to scheduling, actions, quiet hours, and rich in-app templates. Zero breaking changes, maximum flexibility!
 
 [![pub package](https://img.shields.io/pub/v/firebase_messaging_handler.svg)](https://pub.dev/packages/firebase_messaging_handler)
-[![beta](https://img.shields.io/badge/beta-0.1.1--beta.1-orange)](https://pub.dev/packages/firebase_messaging_handler/versions/0.1.1-beta.1)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/qoder-official/firebase_messaging_handler/actions/workflows/ci.yml/badge.svg)](https://github.com/qoder-official/firebase_messaging_handler/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/qoder-official/firebase_messaging_handler/graph/badge.svg)](https://codecov.io/gh/qoder-official/firebase_messaging_handler)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 ## 📋 **Table of Contents**
 
 - [🚀 Quick Start](#-quick-start)
 - [✨ Key Features](#-key-features)
 - [🧰 What You Get](#-what-you-get)
+- [🗂️ Documentation Index](#️-documentation-index)
 - [📦 Installation](#-installation)
 - [🔧 Setup](#-setup)
 - [📖 Usage Examples](#-usage-examples)
@@ -71,7 +73,7 @@ clickStream?.listen((NotificationData? data) {
 ## ✨ **Key Features**
 
 ### **🎯 Core Features**
-- **📱 Cross-Platform Support** - Android, iOS, and Web
+- **📱 Cross-Platform Support** - Android, iOS, Web, plus desktop local-mode support on Windows/Linux
 - **🔄 Unified Notification Stream** - Handle all notification types in one place
 - **🎛️ Flexible Initial Notification Control** - Stream or separate handling
 - **🔑 Smart Token Management** - Automatic optimization with single backend call
@@ -109,11 +111,28 @@ Your app starts simple and scales only when you opt in. Every capability ships w
 - **Progressive adoption**: wire up the click stream today, add interactive actions or in-app templates later without touching existing code.
 - **Configuration-at-callsite**: all advanced APIs expose per-call parameters so you can tailor a single notification without changing global settings.
 - **Navigation flexibility**: Showcase example routes via a root `Navigator` key, demonstrating payload-driven navigation without relying on a BuildContext.
+- **Desktop local mode**: on Windows/Linux, FCM APIs are disabled gracefully while local notifications, scheduling, inbox, quiet hours, and in-app templates remain available.
 
-### **Beta channel**
-- Install the beta: `firebase_messaging_handler: 0.1.1-beta.1`
-- Includes: auto initial-notification stream, unified handler, inbox widget + storage, data-only bridge, payload validator, refreshed docs, and new tests/goldens.
-- Stable users can stay pinned to `0.1.0` until ready to adopt the beta line.
+## 🗂️ **Documentation Index**
+
+Use the README as the landing page, then jump to the deeper guides:
+
+- **Getting started**: [Installation](docs/getting-started/installation.md), [Android setup](docs/getting-started/android-setup.md), [iOS setup](docs/getting-started/ios-setup.md), [macOS setup](docs/getting-started/macos-setup.md), [Desktop setup](docs/getting-started/desktop-setup.md), [Web setup](docs/getting-started/web-setup.md)
+- **Feature guides**: [Push notifications](docs/features/push-notifications.md), [In-app messaging](docs/features/in-app-messaging.md), [Notification inbox](docs/features/notification-inbox.md), [Scheduling](docs/features/scheduling.md), [Badges](docs/features/badges.md), [Quiet hours](docs/features/quiet-hours.md), [Diagnostics](docs/features/diagnostics.md), [Server recipes](docs/features/server-recipes.md)
+- **Backend payloads**: [Payload cookbook](#-payload-cookbook), [Server recipes](server_recipes/README.md)
+- **Project docs**: [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), [Example app guide](example/README.md)
+
+## 🆚 Why this over raw Firebase or Awesome Notifications?
+
+| Capability | Raw firebase_messaging | Awesome Notifications | This package |
+| --- | --- | --- | --- |
+| Background & terminated clicks | Manual isolate wiring | Yes | ✅ Automatic unified stream |
+| Badges & sounds | Manual per-platform | Yes (heavy) | ✅ Built-in, lightweight |
+| In-app UI / inbox | None | Partial (paid features) | ✅ Inbox widget + in-app templates |
+| License | BSD | Commercial/freemium | ✅ BSD-3-Clause |
+| Setup effort | High | Medium/Heavy | ✅ Low (doctor + auto-init) |
+
+> Coming up: permission wizard (Android exact alarm + POST_NOTIFICATIONS), web polish, topic manager UI.
 
 ### **🏗️ Architecture Benefits**
 - **🔧 Modular Design** - Clean separation of concerns
@@ -128,7 +147,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  firebase_messaging_handler: ^latest_version
+  firebase_messaging_handler: ^1.0.0
 ```
 
 ## 🔧 **Setup**
@@ -138,7 +157,7 @@ dependencies:
 1. **Add dependency:**
    ```yaml
    dependencies:
-     firebase_messaging_handler: ^latest_version
+     firebase_messaging_handler: ^1.0.0
    ```
 
 2. **Add basic permissions to `android/app/src/main/AndroidManifest.xml`:**
@@ -1246,6 +1265,8 @@ if (!diagnostics.success || diagnostics.recommendations.isNotEmpty) {
 - `fcmTokenAvailable` – whether a token is cached via `updateTokenCallback`.
 - `badgeSupported` – launcher/platform badge capability (best-effort on Android).
 - `webNotificationsAllowed` / `metadata['webPermission']` – browser permission string.
+- `metadata['webDiagnostics']` – notification API availability, secure-context status, and service-worker/controller checks on web.
+- `metadata['fcmSupported']` / `metadata['fcmUnsupportedReason']` – whether Firebase Messaging is available on the current platform, including desktop local-mode fallback on Windows/Linux.
 - `metadata['backgroundHandlerRegistered']` – confirms `configureBackgroundMessageHandler` has been invoked.
 - `pendingNotificationCount` – number of locally scheduled notifications.
 - `metadata['invalidPayloadCount']` – how many malformed data-only payloads were rejected by the bridge/schema guard.
@@ -1378,6 +1399,8 @@ FirebaseMessagingHandler.resetMockData();
 ## 📦 **Payload Cookbook**
 
 Jump-start backend integration with ready-to-send payloads:
+
+For full backend examples, see [`server_recipes/`](server_recipes/) with Cloud Functions and FCM HTTP v1 templates.
 
 ### **Interactive Notification (Actions + Analytics)**
 
@@ -1800,23 +1823,33 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 📄 **License**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 **Support**
 
 - **Documentation:** [Complete API Reference](https://pub.dev/documentation/firebase_messaging_handler/latest/)
+- **Guides:** [GitHub Pages docs](https://qoder-official.github.io/firebase_messaging_handler/)
 - **Examples:** [Example App](example/) – guided FCM showcase experience
-- **Issues:** [GitHub Issues](https://github.com/your-repo/firebase_messaging_handler/issues)
+- **Issues:** [GitHub Issues](https://github.com/qoder-official/firebase_messaging_handler/issues)
 
 ## 🎉 **What's Next?**
 
-- **In-App UX Kit v1** – survey carousel, tooltip, edge-to-edge banner, HTML modal with safe defaults.
-- **Notification Inbox Widget** – themable list with read/delete and storage abstraction.
-- **Unified Handler + Schema Guard** – single callback across lifecycles with strict data-only validator.
-- **Permission Wizard & Quiet Hours** – guided POST_NOTIFICATIONS/exact alarm/APNs readiness plus defer/cap policies.
-- **Web Polish** – permission overlay, custom icons/badges, service worker validator with actionable logs.
-- **Journeys & Server Recipes** – ready payloads (welcome, win-back, NPS) plus Cloud Functions/REST examples under `server_recipes/`.
-- **Example App Upgrades** – Notification Doctor tab, payload simulator, inbox + in-app demos.
+- **Next up in the package**
+- **Web polish** – pre-permission explainer overlay plus deeper service-worker validation.
+- **macOS push validation** – verify real token retrieval and foreground/background delivery on macOS hardware.
+- **Rich Android styles** – big picture, inbox, progress, and media-style notifications.
+- **Permission Wizard v2** – rationale UI, exact-alarm guidance, provisional iOS flows, and richer result objects.
+- **Remote notification cancel** – allow backend payloads to cancel local notifications by ID/group/channel.
+
+- **Platform and delivery roadmap**
+- **Desktop runtime validation** – verify Windows/Linux local mode on real runners and document exact behavior.
+- **6/6 platform support on pub.dev** – use desktop declarations plus runtime validation to maximize platform credit.
+- **Publish pipeline hardening** – finish external setup for Codecov and pub.dev publishing secrets/trusted publishing.
+
+- **Documentation and growth**
+- **README breakup** – keep this file as the landing page and move deep walkthroughs into docs pages.
+- **API doc coverage** – continue documenting the remaining exported surface to push toward full dartdoc coverage.
+- **Community launch** – blog post, showcase GIFs, Flutter Gems, FlutterAwesome, and social launch.
 
 ---
 

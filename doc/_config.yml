@@ -1,0 +1,6 @@
+title: Firebase Messaging Handler
+description: Production-ready Firebase Cloud Messaging for Flutter
+theme: minima
+plugins:
+  - jekyll-seo-tag
+markdown: kramdown

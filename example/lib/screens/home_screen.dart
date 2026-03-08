@@ -205,15 +205,20 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       await provider.loadCachedData();
 
-      // Fetch FCM token directly if not set by callback
+      // Fetch FCM token directly if not set by callback.
+      // On failure, store the exact reason so the UI can surface it.
       if (provider.fcmToken == null) {
         try {
           final token = await FirebaseMessagingHandler.instance.getFcmToken();
-          if (token != null && mounted) {
-            provider.setFcmToken(token);
+          if (mounted) {
+            final error = FirebaseMessagingHandler.instance.lastTokenError;
+            provider.setFcmToken(token, error: error);
           }
         } catch (e) {
-          debugPrint('Error fetching FCM token: $e');
+          debugPrint('[HomeScreen] Error fetching FCM token: $e');
+          if (mounted) {
+            provider.setFcmToken(null, error: 'Unexpected error fetching token: $e');
+          }
         }
       }
     }
@@ -266,6 +271,9 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) {
         final theme = Theme.of(context);
         final metadata = result.metadata;
+        final webDiagnostics = metadata['webDiagnostics'] is Map<String, dynamic>
+            ? metadata['webDiagnostics'] as Map<String, dynamic>
+            : null;
 
         final entries = [
           _buildDiagnosticsRow(
@@ -276,10 +284,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           _buildDiagnosticsRow(
             'Stored FCM token',
-            result.fcmTokenAvailable
-                ? 'Token cached locally'
-                : 'No token saved',
-            result.fcmTokenAvailable,
+            metadata['fcmSupported'] == false
+                ? 'FCM unavailable on ${result.platform}; local desktop mode active'
+                : result.fcmTokenAvailable
+                    ? 'Token cached locally'
+                    : 'No token saved',
+            metadata['fcmSupported'] == false || result.fcmTokenAvailable,
           ),
           _buildDiagnosticsRow(
             'Badge support',
@@ -290,10 +300,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           _buildDiagnosticsRow(
             'Background handler',
-            metadata['backgroundHandlerRegistered'] == true
+            metadata['fcmSupported'] == false
+                ? 'FCM background handling is unavailable on ${result.platform}'
+                : metadata['backgroundHandlerRegistered'] == true
                 ? 'Registered via configureBackgroundMessageHandler'
                 : 'No background handler registered',
-            metadata['backgroundHandlerRegistered'] == true,
+            metadata['fcmSupported'] == false ||
+                metadata['backgroundHandlerRegistered'] == true,
           ),
           _buildDiagnosticsRow(
             'Pending notifications',
@@ -305,6 +318,32 @@ class _HomeScreenState extends State<HomeScreen> {
               'Web notification permission',
               metadata['webPermission'] as String,
               metadata['webPermission'] == 'granted',
+            ),
+          if (webDiagnostics != null)
+            _buildDiagnosticsRow(
+              'Secure context',
+              webDiagnostics['isSecureContext'] == true
+                  ? 'Running in a secure browser context'
+                  : 'HTTPS/localhost required for web push',
+              webDiagnostics['isSecureContext'] == true,
+            ),
+          if (webDiagnostics != null)
+            _buildDiagnosticsRow(
+              'Service worker',
+              webDiagnostics['serviceWorkerControllerPresent'] == true
+                  ? 'A service worker is controlling this page'
+                  : webDiagnostics['serviceWorkerApiAvailable'] == true
+                      ? 'API available, but no active controller found'
+                      : 'Service workers unavailable in this browser context',
+              webDiagnostics['serviceWorkerControllerPresent'] == true,
+            ),
+          if (webDiagnostics != null)
+            _buildDiagnosticsRow(
+              'Browser notification API',
+              webDiagnostics['notificationApiAvailable'] == true
+                  ? 'Notification API detected'
+                  : 'Notification API unavailable',
+              webDiagnostics['notificationApiAvailable'] == true,
             ),
         ];
 
@@ -332,6 +371,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 ...entries,
+                if (webDiagnostics != null &&
+                    (webDiagnostics['locationProtocol'] != null ||
+                        webDiagnostics['locationHost'] != null)) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Web runtime',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    'Origin: ${webDiagnostics['locationProtocol'] ?? 'unknown'}//'
+                    '${webDiagnostics['locationHost'] ?? 'unknown'}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
                 if (recommendations.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   Text(
@@ -400,22 +454,37 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Consumer<NotificationProvider>(
         builder: (context, provider, child) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildShowcaseBanner(context, provider),
-                const SizedBox(height: 20),
-                _buildApnsWarningBanner(context),
-                const SizedBox(height: 20),
-                _buildStatusStrip(provider),
-                const SizedBox(height: 28),
-                _buildFeatureSection(
-                  title: 'Quick Start Scenarios',
-                  subtitle: 'Run these to validate setup in under a minute.',
-                  features: [
-                    FeatureCard(
+          return Stack(
+            children: [
+              SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildShowcaseBanner(context, provider),
+                    const SizedBox(height: 20),
+                    _buildApnsWarningBanner(context),
+                    const SizedBox(height: 20),
+                    _buildStatusStrip(provider),
+                    const SizedBox(height: 28),
+                if (provider.fcmToken != null) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.icon(
+                      onPressed: () =>
+                          _copyFcmToken(context, provider.fcmToken),
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copy FCM token'),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                    _buildFeatureSection(
+                      title: 'Quick Start Scenarios',
+                      subtitle: 'Run these to validate setup in under a minute.',
+                      features: [
+                        FeatureCard(
                       title: 'Send Interactive Push',
                       description:
                           'Triggers a foreground notification with action buttons.',
@@ -732,7 +801,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildActivityTimeline(provider),
               ],
             ),
-          );
+          ),
+        ],
+      );
         },
       ),
     );
@@ -743,6 +814,7 @@ class _HomeScreenState extends State<HomeScreen> {
     NotificationProvider provider,
   ) {
     final token = provider.fcmToken;
+    final tokenError = provider.tokenError;
     return Card(
       elevation: 3,
       child: Padding(
@@ -795,7 +867,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       : () => _copyFcmToken(context, token),
                   icon: const Icon(Icons.copy),
                   label: Text(
-                    token == null ? 'Waiting for FCM token…' : 'Copy FCM token',
+                    token == null ? 'FCM token unavailable' : 'Copy FCM token',
                   ),
                 ),
                 OutlinedButton.icon(
@@ -811,10 +883,44 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            SelectableText(
-              token ?? 'Token will appear here once Firebase provides it.',
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
+            if (token != null)
+              SelectableText(
+                token,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              )
+            else if (tokenError != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SelectableText(
+                        tokenError,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              const Text(
+                'Waiting for FCM token…',
+                style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
           ],
         ),
       ),

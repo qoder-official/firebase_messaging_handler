@@ -1,4 +1,3 @@
-import 'package:firebase_messaging_handler/firebase_messaging_handler.dart';
 import 'package:firebase_messaging_handler/src/core/utils/bridging_payload_validator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -62,4 +61,3 @@ void main() {
     });
   });
 }
-

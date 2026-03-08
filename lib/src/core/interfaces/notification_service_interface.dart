@@ -78,4 +78,7 @@ abstract class NotificationServiceInterface {
 
   /// Returns the current browser notification permission (web only)
   Future<String> getWebNotificationPermissionStatus();
+
+  /// Returns browser capability and runtime checks for web notification support.
+  Future<Map<String, dynamic>> getWebRuntimeDiagnostics();
 }

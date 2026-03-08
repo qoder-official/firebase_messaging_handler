@@ -7,9 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../services/export.dart';
 import 'in_app_message_manager.dart';
 import '../../models/export.dart';
-import '../../models/normalized_message.dart';
 import '../../enums/export.dart';
-import '../../enums/notification_lifecycle_enum.dart';
 import '../utils/platform_utils.dart';
 import 'badge_manager.dart';
 import '../utils/bridging_payload_validator.dart';
@@ -450,6 +448,10 @@ class NotificationManager {
     }
   }
 
+  /// The reason the last FCM token fetch returned null, or null if it succeeded.
+  /// Useful for surfacing actionable diagnostic messages in the UI.
+  String? get lastTokenError => _fcmService.lastTokenError;
+
   /// Gets FCM token
   Future<String?> getFcmToken() async {
     try {
@@ -582,11 +584,10 @@ class NotificationManager {
   Future<void> setBackgroundMessageHandler(
       Future<void> Function(RemoteMessage message) handler) async {
     try {
-      // Wrap the user handler so the plugin pipeline always hydrates first.
-      await _fcmService.setBackgroundMessageHandler((RemoteMessage message) async {
-        await handleBackgroundMessage(message);
-        await handler(message);
-      });
+      // Register the background handler directly.
+      // Note: The handler must be a top-level or static function to work with FirebaseMessaging.
+      // Do not wrap it in a closure here.
+      await _fcmService.setBackgroundMessageHandler(handler);
       _backgroundHandlerRegistered = true;
       _logMessage('[NotificationManager] Background handler registered');
     } catch (error, stack) {
@@ -638,8 +639,9 @@ class NotificationManager {
     try {
       final NotificationSettings settings =
           await _fcmService.getNotificationSettings();
+      final bool fcmSupported = _fcmService.isSupportedOnCurrentPlatform;
       final bool permissionsGranted =
-          _isAuthorized(settings.authorizationStatus);
+          !fcmSupported || _isAuthorized(settings.authorizationStatus);
 
       final String? storedToken = await _storageService.getFcmToken();
       final bool tokenAvailable = storedToken != null && storedToken.isNotEmpty;
@@ -651,6 +653,8 @@ class NotificationManager {
       final String webPermission =
           await _notificationService.getWebNotificationPermissionStatus();
       final bool webAllowed = webPermission == 'granted';
+      final Map<String, dynamic> webRuntimeDiagnostics =
+          await _notificationService.getWebRuntimeDiagnostics();
 
       final Map<String, dynamic> deliveryDiagnostics =
           _inAppMessageManager.getDeliveryDiagnostics(DateTime.now());
@@ -665,7 +669,15 @@ class NotificationManager {
             '${settings.authorizationStatus.name}.');
       }
 
-      if (!tokenAvailable) {
+      if (!fcmSupported) {
+        recommendations.add(
+            _fcmService.unsupportedPlatformReason ??
+                'Firebase Cloud Messaging is unavailable on this platform.');
+        recommendations.add(
+            'Use local notifications, scheduling, inbox, and in-app templates on desktop. For remote delivery, send through your own backend and handle desktop presentation locally.');
+      }
+
+      if (fcmSupported && !tokenAvailable) {
         recommendations.add(
             'No stored FCM token found. Ensure init() completed and updateTokenCallback saved the token.');
       }
@@ -678,6 +690,30 @@ class NotificationManager {
       if (isWeb && !webAllowed) {
         recommendations.add(
             'Browser notifications are currently "$webPermission". Trigger a permission prompt or guide the user to allow notifications.');
+      }
+
+      if (isWeb &&
+          webRuntimeDiagnostics['notificationApiAvailable'] == false) {
+        recommendations.add(
+            'This browser does not expose the Notification API. Use a supported browser such as Chrome, Edge, or Safari with web notifications enabled.');
+      }
+
+      if (isWeb && webRuntimeDiagnostics['isSecureContext'] == false) {
+        recommendations.add(
+            'Web notifications require a secure context. Serve the app from HTTPS or localhost before testing push delivery.');
+      }
+
+      if (isWeb &&
+          webRuntimeDiagnostics['serviceWorkerApiAvailable'] == false) {
+        recommendations.add(
+            'Service workers are unavailable in this browser context. Web push will not function until service worker support is available.');
+      }
+
+      if (isWeb &&
+          webRuntimeDiagnostics['serviceWorkerApiAvailable'] == true &&
+          webRuntimeDiagnostics['serviceWorkerControllerPresent'] == false) {
+        recommendations.add(
+            'No active service worker is controlling this page. Verify the Firebase messaging service worker is registered at the expected scope.');
       }
 
       if (pendingNotifications.length > 16) {
@@ -702,7 +738,10 @@ class NotificationManager {
           'showPreviews': settings.showPreviews.name,
           'providesAppNotificationSettings':
               settings.providesAppNotificationSettings.name,
+          'fcmSupported': fcmSupported,
+          'fcmUnsupportedReason': _fcmService.unsupportedPlatformReason,
           'webPermission': webPermission,
+          'webDiagnostics': webRuntimeDiagnostics,
           'storedTokenPresent': tokenAvailable,
           'deliveryPolicy': deliveryDiagnostics,
           'queuedBackgroundMessages': queuedBackgroundMessages,
@@ -1368,7 +1407,7 @@ class NotificationManager {
   }) async {
     try {
       await _notificationService.showNotification(
-        id: notificationId ?? DateTime.now().millisecondsSinceEpoch,
+        id: notificationId ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
         title: title,
         body: body,
         channelId: channelId,
@@ -1414,7 +1453,7 @@ class NotificationManager {
           groupTitle: groupTitle,
           channelId: channelId,
           payload: notification.payload,
-          notificationId: DateTime.now().millisecondsSinceEpoch + i,
+          notificationId: DateTime.now().millisecondsSinceEpoch ~/ 1000 + i,
         );
       }
 
@@ -1453,7 +1492,7 @@ class NotificationManager {
   }) async {
     try {
       await _notificationService.showNotification(
-        id: notificationId ?? DateTime.now().millisecondsSinceEpoch,
+        id: notificationId ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
         title: title,
         body: body,
         channelId: channelId,

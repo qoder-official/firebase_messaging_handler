@@ -1,7 +1,8 @@
 import '../../models/export.dart';
 import '../../enums/export.dart';
 
-/// Configuration class for Firebase Cloud Messaging
+/// Immutable configuration object describing how the handler should initialize
+/// Firebase Messaging, local notifications, analytics, and storage behavior.
 class FCMConfiguration {
   /// Sender ID for FCM
   final String senderId;
@@ -67,6 +68,7 @@ class FCMConfiguration {
   /// Whether to show badge by default
   final bool showBadgeByDefault;
 
+  /// Creates a configuration for initializing the handler.
   const FCMConfiguration({
     required this.senderId,
     required this.androidChannels,
@@ -91,7 +93,7 @@ class FCMConfiguration {
     this.showBadgeByDefault = true,
   });
 
-  /// Creates a copy of this configuration with the given fields replaced
+  /// Creates a copy of this configuration with selected fields replaced.
   FCMConfiguration copyWith({
     String? senderId,
     List<NotificationChannelData>? androidChannels,
@@ -151,7 +153,7 @@ class FCMConfiguration {
     );
   }
 
-  /// Creates a configuration from a map
+  /// Recreates a configuration from a serialized map.
   factory FCMConfiguration.fromMap(Map<String, dynamic> map) {
     return FCMConfiguration(
       senderId: map['senderId'] ?? '',
@@ -210,7 +212,7 @@ class FCMConfiguration {
     );
   }
 
-  /// Converts the configuration to a map
+  /// Converts the configuration to a serializable map.
   Map<String, dynamic> toMap() {
     return {
       'senderId': senderId,
@@ -252,14 +254,14 @@ class FCMConfiguration {
     };
   }
 
-  /// Validates the configuration
+  /// Returns true when the minimum required initialization fields are present.
   bool get isValid {
     return senderId.isNotEmpty &&
         androidChannels.isNotEmpty &&
         androidNotificationIconPath.isNotEmpty;
   }
 
-  /// Gets validation errors
+  /// Returns a list of validation errors for missing required fields.
   List<String> get validationErrors {
     final List<String> errors = [];
 

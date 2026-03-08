@@ -1,5 +1,3 @@
-library firebase_messaging_handler;
-
 import 'dart:async';
 import 'src/export.dart';
 import 'src/core/export.dart';
@@ -8,10 +6,19 @@ import 'package:flutter/widgets.dart';
 export 'src/enums/export.dart';
 export 'src/models/export.dart';
 export 'src/core/export.dart';
+export 'src/core/utils/bridging_payload_validator.dart';
 export 'src/in_app/export.dart';
 export 'src/inbox/export.dart';
 
+// Platform registration stubs — exported so Flutter's generated
+// dart_plugin_registrant.dart can resolve them via the main library import.
+export 'firebase_messaging_handler_macos.dart';
+export 'firebase_messaging_handler_linux.dart';
+export 'firebase_messaging_handler_windows.dart';
+
 @pragma('vm:entry-point')
+/// Default background dispatcher entry point that forwards work into the
+/// package-managed background handler pipeline.
 Future<void> firebaseMessagingHandlerBackgroundDispatcher(
     RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +38,7 @@ Future<void> firebaseMessagingHandlerBackgroundDispatcher(
 /// for better maintainability, testability, and extensibility.
 class FirebaseMessagingHandler {
   // Singleton instance
+  /// Shared singleton used by host apps.
   static final FirebaseMessagingHandler instance =
       FirebaseMessagingHandler._internal();
 
@@ -165,7 +173,7 @@ class FirebaseMessagingHandler {
     await _notificationManager.clearBadgeCount();
   }
 
-  /// Creates a notification channel with custom sound (Android)
+  /// Creates an Android notification channel configured with a custom sound.
   Future<void> createCustomSoundChannel({
     required String channelId,
     required String channelName,
@@ -188,14 +196,25 @@ class FirebaseMessagingHandler {
     );
   }
 
-  /// Gets available system notification sounds (iOS)
+  /// Returns the system sound identifiers available on iOS, when supported.
   Future<List<String>?> getAvailableSounds() async {
     return await _notificationManager.getAvailableSounds();
   }
 
   // ========== TESTING UTILITIES ==========
+  //
+  // These members are intended for use in host-app tests only.
+  // They are NOT part of the production API and have no effect unless
+  // [setTestMode] is called first.
 
-  /// Enables test mode for mocking Firebase messaging in tests
+  /// Enables or disables test mode.
+  ///
+  /// When enabled, a set of in-memory mock streams replace the real Firebase
+  /// infrastructure so widget and integration tests can drive notification
+  /// flows without a Firebase project or physical device.
+  ///
+  /// Call `setTestMode(false)` in [tearDown] to clean up stream controllers.
+  @visibleForTesting
   static void setTestMode(bool enabled) {
     if (_testModeEnabled == enabled) {
       return;
@@ -215,12 +234,17 @@ class FirebaseMessagingHandler {
     }
   }
 
-  /// Gets mock notification stream for testing
+  /// Returns the raw [RemoteMessage] stream backed by an in-memory controller.
+  /// Only non-null when [setTestMode] has been called with `true`.
+  @visibleForTesting
   static Stream<RemoteMessage>? getMockNotificationStream() {
     return _mockRemoteMessageController?.stream;
   }
 
-  /// Adds a mock notification to the test stream
+  /// Injects [message] into the mock pipeline and triggers the unified handler.
+  ///
+  /// Requires [setTestMode] to have been called first.
+  @visibleForTesting
   static void addMockNotification(RemoteMessage message) {
     if (!_testModeEnabled) {
       throw StateError(
@@ -232,12 +256,18 @@ class FirebaseMessagingHandler {
         .processNotification(message));
   }
 
-  /// Gets mock click stream for testing
+  /// Returns the click-event stream backed by an in-memory controller.
+  /// Only non-null when [setTestMode] has been called with `true`.
+  @visibleForTesting
   static Stream<NotificationData>? getMockClickStream() {
     return _mockClickController?.stream;
   }
 
-  /// Adds a mock click event to the test stream
+  /// Emits [data] on the mock click stream and routes it through the
+  /// notification manager's test sink.
+  ///
+  /// Use this to simulate the user tapping a notification in tests.
+  @visibleForTesting
   static void addMockClickEvent(NotificationData data) {
     if (!_testModeEnabled) {
       throw StateError(
@@ -247,7 +277,9 @@ class FirebaseMessagingHandler {
     FirebaseMessagingHandler.instance._notificationManager.emitTestClick(data);
   }
 
-  /// Resets all mock data for clean test state
+  /// Closes and replaces the mock stream controllers, giving each test a clean
+  /// slate. Call this in [setUp] or [tearDown] to prevent event bleed-through.
+  @visibleForTesting
   static void resetMockData() {
     if (!_testModeEnabled) {
       return;
@@ -260,7 +292,10 @@ class FirebaseMessagingHandler {
     _mockClickController = StreamController<NotificationData>.broadcast();
   }
 
-  /// Creates a mock RemoteMessage for testing
+  /// Constructs a [RemoteMessage] with the given fields, filling in sensible
+  /// defaults for any omitted values. Useful for building synthetic payloads
+  /// in unit and integration tests without a real Firebase project.
+  @visibleForTesting
   static RemoteMessage createMockRemoteMessage({
     String? messageId,
     String? title,
@@ -298,7 +333,9 @@ class FirebaseMessagingHandler {
     return RemoteMessage.fromMap(map);
   }
 
-  /// Creates a mock NotificationData for testing
+  /// Constructs a [NotificationData] object suitable for use in tests.
+  /// Mirrors the shape of real click events emitted by the handler.
+  @visibleForTesting
   static NotificationData createMockNotificationData({
     Map<String, dynamic>? payload,
     String? title,
@@ -523,6 +560,11 @@ class FirebaseMessagingHandler {
     return await _notificationManager.getFcmToken();
   }
 
+  /// If the last FCM token fetch failed, returns a human-readable explanation
+  /// of why (e.g. APNs not configured, running on simulator).
+  /// Returns null when a token was successfully retrieved.
+  String? get lastTokenError => _notificationManager.lastTokenError;
+
   /// Sets the analytics callback function to track notification events.
   ///
   /// This callback will be invoked whenever a notification event occurs,
@@ -648,5 +690,12 @@ class FirebaseMessagingHandler {
   /// availability, badge support, and other platform readiness checks.
   Future<NotificationDiagnosticsResult> runDiagnostics() async {
     return await _notificationManager.runDiagnostics();
+  }
+
+  /// Guides users through notification permissions. On Android 13+ this requests
+  /// POST_NOTIFICATIONS; on iOS it requests alert/badge/sound. For exact alarms
+  /// and other platform quirks, see the returned notes.
+  Future<PermissionWizardResult> requestPermissionsWizard() async {
+    return await const PermissionWizardService().requestPermissions();
   }
 }

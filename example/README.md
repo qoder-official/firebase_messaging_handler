@@ -213,6 +213,12 @@ For iOS notifications to work properly, you **MUST** configure APNs:
 - Verify notification display in browser
 - Check service worker integration
 
+### **Windows / Linux**
+- Remote FCM is not available on these platforms
+- Use the example to validate desktop local mode instead
+- Open Notification Doctor and confirm it reports `FCM unavailable` with local desktop mode active
+- Test local notification scheduling, inbox flows, and in-app templates
+
 ## 🔧 **Configuration Options**
 
 The example demonstrates various configuration options:

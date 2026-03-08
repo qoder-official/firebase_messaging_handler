@@ -10,7 +10,6 @@ import '../interfaces/notification_service_interface.dart';
 import '../managers/notification_manager.dart';
 import '../../enums/export.dart';
 import '../../constants/firebase_messaging_handler_constants.dart';
-import '../../enums/repeat_interval_enum.dart';
 import '../../models/export.dart';
 import '../utils/platform_utils.dart';
 import 'storage_service.dart';
@@ -550,6 +549,79 @@ class FirebaseMessagingHandlerNotificationService
       _logMessage('[NotificationService] Web permission status error: $error');
       _logMessage('[NotificationService] Stack trace: $stack');
       return 'error';
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getWebRuntimeDiagnostics() async {
+    if (!isWeb) {
+      return <String, dynamic>{
+        'supported': false,
+        'reason': 'unavailable',
+      };
+    }
+
+    try {
+      final bool notificationApiAvailable =
+          js.context.hasProperty('Notification');
+      final dynamic navigator = js.context['navigator'];
+      final bool navigatorAvailable = navigator != null;
+      final bool serviceWorkerApiAvailable =
+          navigatorAvailable && navigator.hasProperty('serviceWorker');
+      final dynamic serviceWorker = serviceWorkerApiAvailable
+          ? navigator['serviceWorker']
+          : null;
+      final bool serviceWorkerControllerPresent = serviceWorker != null &&
+          serviceWorker.hasProperty('controller') &&
+          serviceWorker['controller'] != null;
+      final bool pushManagerAvailable =
+          serviceWorker != null && serviceWorker.hasProperty('ready');
+
+      bool isSecureContext = false;
+      if (js.context.hasProperty('isSecureContext')) {
+        final dynamic secureContext = js.context['isSecureContext'];
+        if (secureContext is bool) {
+          isSecureContext = secureContext;
+        }
+      }
+
+      String? locationProtocol;
+      String? locationHost;
+      if (js.context.hasProperty('location')) {
+        final dynamic location = js.context['location'];
+        if (location != null) {
+          if (location.hasProperty('protocol')) {
+            locationProtocol = location['protocol']?.toString();
+          }
+          if (location.hasProperty('host')) {
+            locationHost = location['host']?.toString();
+          }
+        }
+      }
+
+      String? userAgent;
+      if (navigatorAvailable && navigator.hasProperty('userAgent')) {
+        userAgent = navigator['userAgent']?.toString();
+      }
+
+      return <String, dynamic>{
+        'supported': notificationApiAvailable,
+        'notificationApiAvailable': notificationApiAvailable,
+        'serviceWorkerApiAvailable': serviceWorkerApiAvailable,
+        'serviceWorkerControllerPresent': serviceWorkerControllerPresent,
+        'pushManagerLikelyAvailable': pushManagerAvailable,
+        'isSecureContext': isSecureContext,
+        'locationProtocol': locationProtocol,
+        'locationHost': locationHost,
+        'userAgent': userAgent,
+      };
+    } catch (error, stack) {
+      _logMessage('[NotificationService] Web runtime diagnostics error: $error');
+      _logMessage('[NotificationService] Stack trace: $stack');
+      return <String, dynamic>{
+        'supported': false,
+        'error': error.toString(),
+      };
     }
   }
 

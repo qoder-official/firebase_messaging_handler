@@ -24,6 +24,7 @@ class NotificationProvider extends ChangeNotifier {
   NotificationData? _initialNotification;
   NotificationData? _activeNotification;
   String? _fcmToken;
+  String? _tokenError;
   bool _isInitialized = false;
   int _iosBadgeCount = 0;
   int _androidBadgeCount = 0;
@@ -37,6 +38,8 @@ class NotificationProvider extends ChangeNotifier {
   NotificationData? get initialNotification => _initialNotification;
   NotificationData? get activeNotification => _activeNotification;
   String? get fcmToken => _fcmToken;
+  /// Human-readable reason the FCM token could not be retrieved, or null if it succeeded.
+  String? get tokenError => _tokenError;
   bool get isInitialized => _isInitialized;
   int get iosBadgeCount => _iosBadgeCount;
   int get androidBadgeCount => _androidBadgeCount;
@@ -61,8 +64,9 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setFcmToken(String? token) {
+  void setFcmToken(String? token, {String? error}) {
     _fcmToken = token;
+    _tokenError = error;
     notifyListeners();
   }
 
