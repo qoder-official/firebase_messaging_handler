@@ -73,7 +73,7 @@ class FirebaseMessagingHandlerNotificationService
       );
 
       final bool? isInitialized = await _localNotifications!.initialize(
-        initializationSettings,
+        settings: initializationSettings,
         onDidReceiveNotificationResponse: _onNotificationResponse,
       );
 
@@ -144,10 +144,10 @@ class FirebaseMessagingHandlerNotificationService
       );
 
       await _localNotifications!.show(
-        id,
-        title,
-        body,
-        notificationDetails,
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: notificationDetails,
         payload: jsonEncode(payload ?? {}),
       );
 
@@ -182,10 +182,10 @@ class FirebaseMessagingHandlerNotificationService
 
       _ensureInitialized();
       await _localNotifications!.show(
-        id,
-        title,
-        body,
-        NotificationDetails(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             channelId ?? 'action_channel',
             'Action Notifications',
@@ -278,15 +278,13 @@ class FirebaseMessagingHandlerNotificationService
 
       _ensureInitialized();
       await _localNotifications!.zonedSchedule(
-        id,
-        title,
-        body,
-        tz.TZDateTime.from(scheduledDate, tz.local),
-        notificationDetails,
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: tz.TZDateTime.from(scheduledDate, tz.local),
+        notificationDetails: notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         payload: jsonEncode(payload ?? {}),
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
       );
 
       _logMessage(
@@ -356,11 +354,11 @@ class FirebaseMessagingHandlerNotificationService
                 : RepeatInterval.everyMinute;
 
         await _localNotifications!.periodicallyShow(
-          id,
-          title,
-          body,
-          periodicInterval,
-          notificationDetails,
+          id: id,
+          title: title,
+          body: body,
+          repeatInterval: periodicInterval,
+          notificationDetails: notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           payload: jsonEncode(encodedPayload),
         );
@@ -382,16 +380,14 @@ class FirebaseMessagingHandlerNotificationService
       }
 
       await _localNotifications!.zonedSchedule(
-        id,
-        title,
-        body,
-        normalizedDate,
-        notificationDetails,
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: normalizedDate,
+        notificationDetails: notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         payload: jsonEncode(encodedPayload),
         matchDateTimeComponents: matchComponents,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
       );
 
       _logMessage(
@@ -415,7 +411,7 @@ class FirebaseMessagingHandlerNotificationService
       }
 
       _ensureInitialized();
-      await _localNotifications!.cancel(id);
+      await _localNotifications!.cancel(id: id);
       _logMessage('[NotificationService] Notification cancelled: $id');
     } catch (error, stack) {
       _logMessage('[NotificationService] Cancel notification error: $error');
@@ -496,7 +492,7 @@ class FirebaseMessagingHandlerNotificationService
             android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
             iOS: const DarwinInitializationSettings(),
           );
-          await temp.initialize(init);
+          await temp.initialize(settings: init);
         } catch (_) {
           // Best-effort; still attempt to read launch details
         }

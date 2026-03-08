@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.1] - 2026-03-08
 
+### Changed
+- `flutter_local_notifications` constraint widened to `>=18.0.1 <22.0.0` — now fully compatible with v21 (named parameter API)
+
 ### Fixed
+- Updated all `flutter_local_notifications` call sites to v21 named parameter API (`show`, `initialize`, `zonedSchedule`, `periodicallyShow`, `cancel`)
+- Removed deprecated `uiLocalNotificationDateInterpretation` parameter from `zonedSchedule` calls
 - Removed broken CI and codecov badges from README
 
 ---
